@@ -1,12 +1,14 @@
 // =============================================================================
 // services/api.js
-// The ONLY module in this project allowed to talk to the network.
-// Responsible for: Firebase / Firestore, backend (/api/search, /api/suggest),
-// LRCLIB lyrics, and the search-cache strategy. app.js never imports network
-// primitives directly — everything below is the contract app.js relies on.
+// The ONLY module in this project allowed to touch the network.
+// Responsible for: initializing Firebase/Firestore, the search-cache read
+// path, calling the backend (/api/search, /api/suggest), LRCLIB lyrics, and
+// the Settings (backend URL) persistence. app.js never imports fetch(),
+// firebase, or firestore directly — everything below is the contract it
+// relies on.
 // =============================================================================
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore,
   doc,
@@ -22,10 +24,11 @@ import {
 // -----------------------------------------------------------------------------
 // Firebase configuration
 // -----------------------------------------------------------------------------
-// Replace with your own Firebase project's web config. The client SDK only
-// ever performs reads (songs, search-cache); all writes happen inside the
-// Vercel backend using the Firebase Admin SDK and a service account, so the
-// values below never need write privileges in your Firestore security rules.
+// Replace with your own Firebase project's web config (Project settings ->
+// General -> Your apps -> SDK setup and configuration). The client SDK here
+// only ever performs reads (songs, search-cache); all writes happen inside
+// the Vercel backend using firebase-admin + a service account, so these
+// values never need write access in your Firestore security rules.
 const firebaseConfig = {
   apiKey: "AIzaSyA2UJT5RD7CAcOJR6OTWfpkOEf8l2lhqlw",
   authDomain: "temporaryfileupload-92123.firebaseapp.com",
@@ -35,27 +38,25 @@ const firebaseConfig = {
   appId: "1:1068057413521:web:d4c2ba30c6c12e57ddfc30"
 };
 
-let firebaseApp = null;
 let db = null;
 
 /**
- * Initializes the Firebase app + Firestore instance. Safe to call once at
- * startup. Idempotent: repeated calls reuse the same instance.
+ * Initializes Firebase + Firestore. Safe to call multiple times — reuses the
+ * existing app instance if one is already running.
  */
 export function initFirebase() {
   if (db) return db;
-  firebaseApp = initializeApp(firebaseConfig);
-  db = getFirestore(firebaseApp);
+  const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+  db = getFirestore(app);
   return db;
 }
 
 function ensureDb() {
-  if (!db) initFirebase();
-  return db;
+  return db || initFirebase();
 }
 
 // -----------------------------------------------------------------------------
-// Backend URL (Settings)
+// Settings: backend URL
 // -----------------------------------------------------------------------------
 const BACKEND_URL_KEY = "melodify_backend_url";
 
@@ -73,7 +74,7 @@ export function setBackendUrl(url) {
   try {
     localStorage.setItem(BACKEND_URL_KEY, (url || "").trim().replace(/\/+$/, ""));
   } catch {
-    /* localStorage unavailable — silently ignore */
+    /* localStorage unavailable in this context — ignore silently */
   }
 }
 
@@ -91,13 +92,8 @@ function backendFetch(path, params) {
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
-
-/** Normalizes a search query: lowercase, trimmed, collapsed whitespace. */
 function normalizeQuery(raw) {
-  return (raw || "")
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, " ");
+  return (raw || "").toLowerCase().trim().replace(/\s+/g, " ");
 }
 
 function songDocToObject(id, data) {
@@ -108,8 +104,6 @@ function songDocToObject(id, data) {
     album: data.album || "",
     duration: typeof data.duration === "number" ? data.duration : 0,
     thumbnail: data.thumbnail || "",
-    videoIdSong: data.videoIdSong || id,
-    videoIdVideo: data.videoIdVideo || id,
   };
 }
 
@@ -118,32 +112,28 @@ function songDocToObject(id, data) {
 // -----------------------------------------------------------------------------
 
 /**
- * Loads song metadata for a list of videoIds from the Firestore `songs`
- * collection, preserving the input order. Ids with no matching document are
- * skipped (their metadata is populated server-side the first time a search
- * surfaces them, so a missing doc means the id was never a valid result).
+ * Loads song metadata for a list of videoIds from Firestore's `songs`
+ * collection, preserving input order. Ids without a matching document are
+ * skipped — metadata is written server-side the first time a search surfaces
+ * a track, so a missing doc means the id never resolved to a real result.
  */
 export async function getSongsByIds(videoIds) {
   const database = ensureDb();
   const unique = [...new Set((videoIds || []).filter(Boolean))];
-  const results = new Map();
+  const found = new Map();
 
   await Promise.all(
     unique.map(async (id) => {
       try {
         const snap = await getDoc(doc(database, "songs", id));
-        if (snap.exists()) {
-          results.set(id, songDocToObject(id, snap.data()));
-        }
+        if (snap.exists()) found.set(id, songDocToObject(id, snap.data()));
       } catch {
-        // Network hiccup on a single doc shouldn't fail the whole batch.
+        // A single failed lookup shouldn't fail the whole batch.
       }
     })
   );
 
-  return (videoIds || [])
-    .filter((id) => results.has(id))
-    .map((id) => results.get(id));
+  return (videoIds || []).filter((id) => found.has(id)).map((id) => found.get(id));
 }
 
 // -----------------------------------------------------------------------------
@@ -154,10 +144,9 @@ export async function getSongsByIds(videoIds) {
  * Full search flow:
  *  1. Normalize the query.
  *  2. Check Firestore `search-cache` for a matching document.
- *  3. On a hit, load song metadata straight from Firestore — no backend call.
+ *  3. On a hit, resolve song metadata straight from Firestore — no backend call.
  *  4. On a miss, call /api/search. The backend calls the YouTube Data API,
- *     writes the `songs` and `search-cache` collections, and returns the
- *     resolved songs directly.
+ *     writes `songs` + `search-cache`, and returns the resolved songs.
  */
 export async function searchSongs(rawQuery) {
   const normalized = normalizeQuery(rawQuery);
@@ -186,8 +175,8 @@ export async function searchSongs(rawQuery) {
 
 /**
  * Search-as-you-type suggestions, capped at six. Tries Firestore's `songs`
- * collection (prefix match on `titleLower`) first; falls back to /api/suggest
- * only when Firestore has nothing to offer.
+ * collection (prefix match on `titleLower`) first; falls back to
+ * /api/suggest only when Firestore has nothing cached yet.
  */
 export async function getSuggestions(rawQuery) {
   const normalized = normalizeQuery(rawQuery);
@@ -212,7 +201,7 @@ export async function getSuggestions(rawQuery) {
       });
     }
   } catch {
-    // Fall through to backend suggestions.
+    // Fall through to the backend.
   }
 
   try {
@@ -244,8 +233,7 @@ function parseLrc(lrcText) {
       const minutes = parseInt(m[1], 10);
       const seconds = parseInt(m[2], 10);
       const millis = m[3] ? parseInt(m[3].padEnd(3, "0"), 10) : 0;
-      const time = minutes * 60 + seconds + millis / 1000;
-      out.push({ time, text });
+      out.push({ time: minutes * 60 + seconds + millis / 1000, text });
     }
   }
 
@@ -257,17 +245,13 @@ function parseLrc(lrcText) {
  * { synced: [{time,text}]|null, plain: string|null } or null if unavailable.
  */
 export async function fetchLyrics({ title, artist, duration }) {
-  const params = new URLSearchParams({
-    track_name: title || "",
-    artist_name: artist || "",
-  });
-  if (duration) params.set("duration", String(Math.round(duration)));
+  const getParams = new URLSearchParams({ track_name: title || "", artist_name: artist || "" });
+  if (duration) getParams.set("duration", String(Math.round(duration)));
 
   try {
-    const response = await fetch(`https://lrclib.net/api/get?${params.toString()}`, {
+    const response = await fetch(`https://lrclib.net/api/get?${getParams.toString()}`, {
       headers: { Accept: "application/json" },
     });
-
     if (response.ok) {
       const data = await response.json();
       const synced = data.syncedLyrics ? parseLrc(data.syncedLyrics) : null;
@@ -275,14 +259,11 @@ export async function fetchLyrics({ title, artist, duration }) {
       if (synced || plain) return { synced, plain };
     }
   } catch {
-    // fall through to search fallback below
+    // fall through to the search-based fallback below
   }
 
   try {
-    const searchParams = new URLSearchParams({
-      track_name: title || "",
-      artist_name: artist || "",
-    });
+    const searchParams = new URLSearchParams({ track_name: title || "", artist_name: artist || "" });
     const response = await fetch(`https://lrclib.net/api/search?${searchParams.toString()}`, {
       headers: { Accept: "application/json" },
     });
@@ -296,7 +277,7 @@ export async function fetchLyrics({ title, artist, duration }) {
       }
     }
   } catch {
-    // no lyrics available anywhere
+    // no lyrics available anywhere for this track
   }
 
   return null;

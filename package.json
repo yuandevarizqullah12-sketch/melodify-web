@@ -1,0 +1,17 @@
+{
+  "name": "melodify-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Melodify — a lightweight, audio-only music streaming web app.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.1.0"
+  }
+}

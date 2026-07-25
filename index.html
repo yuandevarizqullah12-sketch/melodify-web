@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Melodify — Listen without limits</title>
-<meta name="description" content="Melodify, a premium music streaming experience.">
+<title>Melodify — Music, uninterrupted</title>
+<meta name="description" content="Melodify, a lightweight music streaming experience.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -12,9 +12,9 @@
 </head>
 <body>
 
-<div class="app-shell song-mode" id="appShell">
+<div class="app-shell" id="appShell">
 
-  <!-- ===================== SIDEBAR / MOBILE NAV ===================== -->
+  <!-- ===================== SIDEBAR / DESKTOP NAV ===================== -->
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <span class="brand-mark" aria-hidden="true">
@@ -65,7 +65,7 @@
     <header class="topbar">
       <button class="icon-btn topbar-search-trigger" id="searchTriggerBtn" type="button" aria-label="Open search">
         <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <span>Search for a song, artist, or album</span>
+        <span>Search for a song or artist</span>
       </button>
     </header>
 
@@ -76,7 +76,7 @@
         <div class="home-hero">
           <p class="home-eyebrow">Melodify</p>
           <h1 class="home-greeting" id="greetingText">Good evening</h1>
-          <p class="home-sub">Pick up where the needle left off.</p>
+          <p class="home-sub">Pick up where you left off.</p>
         </div>
 
         <div class="quick-actions" id="quickActions">
@@ -124,13 +124,14 @@
       <section class="view" id="playlistDetailView" data-view-name="playlistDetail">
         <div class="playlist-detail-header">
           <div class="playlist-detail-art" id="playlistDetailArt" aria-hidden="true"></div>
-          <div>
+          <div class="playlist-detail-info">
             <p class="playlist-detail-eyebrow">Playlist</p>
-            <h1 class="playlist-detail-title" id="playlistDetailTitle"></h1>
+            <h1 class="playlist-detail-title" id="playlistDetailTitle" tabindex="0"></h1>
             <p class="playlist-detail-count" id="playlistDetailCount"></p>
             <div class="playlist-detail-actions">
               <button class="pill-btn pill-btn--primary" id="playlistDetailPlayBtn" type="button">Play</button>
-              <button class="pill-btn" id="playlistDetailDeleteBtn" type="button">Delete playlist</button>
+              <button class="pill-btn" id="playlistDetailRenameBtn" type="button">Rename</button>
+              <button class="pill-btn pill-btn--danger" id="playlistDetailDeleteBtn" type="button">Delete</button>
             </div>
           </div>
         </div>
@@ -146,23 +147,20 @@
     <div class="search-overlay-panel">
       <div class="search-overlay-bar">
         <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input type="text" id="searchInput" class="search-input" placeholder="Search songs, artists, albums…" autocomplete="off" spellcheck="false">
+        <input type="text" id="searchInput" class="search-input" placeholder="Search songs or artists…" autocomplete="off" spellcheck="false">
         <button class="icon-btn" id="searchCloseBtn" type="button" aria-label="Close search">
           <svg class="icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
         </button>
       </div>
-
       <div class="search-overlay-body" id="searchOverlayBody">
         <ul class="suggestions-list" id="searchSuggestions"></ul>
-
         <div class="search-status" id="searchStatus"></div>
-
         <div class="song-list" id="searchResultsList"></div>
       </div>
     </div>
   </div>
 
-  <!-- ===================== NOW PLAYING SHEET ===================== -->
+  <!-- ===================== NOW PLAYING SHEET (mobile full view) ===================== -->
   <div class="now-playing-sheet" id="nowPlayingSheet" aria-hidden="true">
     <div class="sheet-header">
       <button class="icon-btn" id="collapseSheetBtn" type="button" aria-label="Minimize">
@@ -175,10 +173,7 @@
     </div>
 
     <div class="sheet-stage">
-      <div class="video-wrap" id="videoWrap">
-        <div id="youtubePlayer"></div>
-      </div>
-      <div class="vinyl-wrap player-art-wrap">
+      <div class="vinyl-wrap">
         <img class="player-art vinyl-art" id="sheetArtImg" alt="" width="320" height="320">
         <div class="vinyl-ring" aria-hidden="true"></div>
       </div>
@@ -215,15 +210,14 @@
         <svg class="icon" viewBox="0 0 24 24"><path d="M5 5v14l11-7z"/><path d="M18 5v14"/></svg>
       </button>
       <button class="icon-btn repeat-btn" type="button" aria-label="Repeat">
-        <svg class="icon icon-repeat-off" viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        <svg class="icon" viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
         <span class="repeat-one-dot" hidden>1</span>
       </button>
     </div>
 
     <div class="sheet-footer">
-      <button class="icon-btn mode-toggle-btn" type="button" aria-label="Switch to video mode">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M4 5h12v14H4zM16 9l6-4v14l-6-4"/></svg>
-        <span class="mode-toggle-label">Video</span>
+      <button class="icon-btn add-to-playlist-btn" type="button" aria-label="Add to playlist">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
       </button>
       <div class="volume-control">
         <button class="icon-btn volume-btn" type="button" aria-label="Mute">
@@ -232,9 +226,6 @@
         </button>
         <input type="range" class="volume-slider" min="0" max="100" value="80" aria-label="Volume">
       </div>
-      <button class="icon-btn add-to-playlist-btn" type="button" aria-label="Add to playlist">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path d="M21 3v0"/></svg>
-      </button>
     </div>
   </div>
 
@@ -247,7 +238,7 @@
       </button>
     </div>
     <div class="lyrics-panel-body" id="lyricsPanelBody">
-      <p class="lyrics-empty" id="lyricsEmptyState">Play a song to see its lyrics.</p>
+      <p class="lyrics-empty">Play a song to see its lyrics.</p>
     </div>
   </div>
 
@@ -280,7 +271,7 @@
           <svg class="icon" viewBox="0 0 24 24"><path d="M5 5v14l11-7z"/><path d="M18 5v14"/></svg>
         </button>
         <button class="icon-btn repeat-btn" type="button" aria-label="Repeat">
-          <svg class="icon icon-repeat-off" viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          <svg class="icon" viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
           <span class="repeat-one-dot" hidden>1</span>
         </button>
       </div>
@@ -295,8 +286,8 @@
       <button class="icon-btn lyrics-btn" type="button" aria-label="Toggle lyrics">
         <svg class="icon" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13M9 9l11-2"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
       </button>
-      <button class="icon-btn mode-toggle-btn" type="button" aria-label="Switch to video mode">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M4 5h12v14H4zM16 9l6-4v14l-6-4"/></svg>
+      <button class="icon-btn add-to-playlist-btn" type="button" aria-label="Add to playlist">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
       </button>
       <div class="volume-control">
         <button class="icon-btn volume-btn" type="button" aria-label="Mute">
@@ -335,7 +326,7 @@
   <div class="modal-overlay" id="playlistModal" aria-hidden="true">
     <div class="modal-panel">
       <div class="modal-header">
-        <h2 id="playlistModalTitle">Add to playlist</h2>
+        <h2>Add to playlist</h2>
         <button class="icon-btn" id="playlistModalCloseBtn" type="button" aria-label="Close">
           <svg class="icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
         </button>
@@ -369,6 +360,13 @@
 
   <!-- ===================== TOASTS ===================== -->
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- ===================== HIDDEN AUDIO HOST ===================== -->
+  <!-- The YouTube IFrame API needs a real element in the DOM to mount into.
+       It is permanently off-screen — Melodify never shows video. -->
+  <div class="hidden-audio-host" id="hiddenAudioHost" aria-hidden="true">
+    <div id="youtubePlayer"></div>
+  </div>
 
 </div>
 
