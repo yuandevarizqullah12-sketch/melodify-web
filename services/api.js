@@ -1,11 +1,12 @@
 // =============================================================================
 // services/api.js
 // The ONLY module in this project allowed to touch the network.
-// Responsible for: initializing Firebase/Firestore, the search-cache read
-// path, calling the backend (/api/search, /api/suggest), LRCLIB lyrics, and
-// the Settings (backend URL) persistence. app.js never imports fetch(),
-// firebase, or firestore directly — everything below is the contract it
-// relies on.
+// Responsible for: initializing Firebase/Firestore, reading the search
+// cache, calling the one backend endpoint (/api/search), and LRCLIB lyrics.
+// app.js never imports fetch(), firebase, or firestore directly.
+//
+// The frontend never writes to Firestore and never builds a dynamic backend
+// URL — every backend call is a plain, fixed fetch("/api/search?...").
 // =============================================================================
 
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -13,12 +14,6 @@ import {
   getFirestore,
   doc,
   getDoc,
-  getDocs,
-  collection,
-  query,
-  where,
-  orderBy,
-  limit as fsLimit,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // -----------------------------------------------------------------------------
@@ -55,43 +50,6 @@ function ensureDb() {
   return db || initFirebase();
 }
 
-// -----------------------------------------------------------------------------
-// Settings: backend URL
-// -----------------------------------------------------------------------------
-const BACKEND_URL_KEY = "melodify_backend_url";
-
-/** Reads the configured backend base URL from localStorage (empty = same origin). */
-export function getBackendUrl() {
-  try {
-    return localStorage.getItem(BACKEND_URL_KEY) || "";
-  } catch {
-    return "";
-  }
-}
-
-/** Persists the backend base URL to localStorage. */
-export function setBackendUrl(url) {
-  try {
-    localStorage.setItem(BACKEND_URL_KEY, (url || "").trim().replace(/\/+$/, ""));
-  } catch {
-    /* localStorage unavailable in this context — ignore silently */
-  }
-}
-
-function backendFetch(path, params) {
-  const base = getBackendUrl();
-  const url = new URL(base + path, window.location.origin);
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      url.searchParams.set(key, value);
-    }
-  });
-  return fetch(url.toString(), { headers: { Accept: "application/json" } });
-}
-
-// -----------------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------------
 function normalizeQuery(raw) {
   return (raw || "").toLowerCase().trim().replace(/\s+/g, " ");
 }
@@ -141,12 +99,13 @@ export async function getSongsByIds(videoIds) {
 // -----------------------------------------------------------------------------
 
 /**
- * Full search flow:
+ * Search flow:
  *  1. Normalize the query.
- *  2. Check Firestore `search-cache` for a matching document.
+ *  2. Check Firestore `search-cache` for a matching document (read-only).
  *  3. On a hit, resolve song metadata straight from Firestore — no backend call.
- *  4. On a miss, call /api/search. The backend calls the YouTube Data API,
- *     writes `songs` + `search-cache`, and returns the resolved songs.
+ *  4. On a miss, call GET /api/search?q=<query>. The backend calls the
+ *     YouTube Data API, writes `songs` + `search-cache`, and returns the
+ *     resolved songs directly. The caller never learns which path was taken.
  */
 export async function searchSongs(rawQuery) {
   const normalized = normalizeQuery(rawQuery);
@@ -165,54 +124,14 @@ export async function searchSongs(rawQuery) {
     // Firestore unreachable — fall through to the backend.
   }
 
-  const response = await backendFetch("/api/search", { q: normalized });
+  const response = await fetch(`/api/search?q=${encodeURIComponent(normalized)}`, {
+    headers: { Accept: "application/json" },
+  });
   if (!response.ok) {
     throw new Error(`Search failed with status ${response.status}`);
   }
   const payload = await response.json();
   return Array.isArray(payload.songs) ? payload.songs : [];
-}
-
-/**
- * Search-as-you-type suggestions, capped at six. Tries Firestore's `songs`
- * collection (prefix match on `titleLower`) first; falls back to
- * /api/suggest only when Firestore has nothing cached yet.
- */
-export async function getSuggestions(rawQuery) {
-  const normalized = normalizeQuery(rawQuery);
-  if (!normalized) return [];
-
-  const database = ensureDb();
-
-  try {
-    const songsRef = collection(database, "songs");
-    const prefixQuery = query(
-      songsRef,
-      orderBy("titleLower"),
-      where("titleLower", ">=", normalized),
-      where("titleLower", "<=", normalized + "\uf8ff"),
-      fsLimit(6)
-    );
-    const snap = await getDocs(prefixQuery);
-    if (!snap.empty) {
-      return snap.docs.slice(0, 6).map((d) => {
-        const data = d.data();
-        return { label: `${data.title} — ${data.artist}`, query: data.title };
-      });
-    }
-  } catch {
-    // Fall through to the backend.
-  }
-
-  try {
-    const response = await backendFetch("/api/suggest", { q: normalized });
-    if (!response.ok) return [];
-    const payload = await response.json();
-    const list = Array.isArray(payload.suggestions) ? payload.suggestions : [];
-    return list.slice(0, 6).map((s) => (typeof s === "string" ? { label: s, query: s } : s));
-  } catch {
-    return [];
-  }
 }
 
 // -----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 {
-  "name": "melodify-web",
+  "name": "melodify",
   "version": "1.0.0",
   "private": true,
   "description": "Melodify — a lightweight, audio-only music streaming web app.",

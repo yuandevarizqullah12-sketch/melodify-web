@@ -3,12 +3,6 @@
   "functions": {
     "api/search.js": {
       "maxDuration": 15
-    },
-    "api/suggest.js": {
-      "maxDuration": 10
-    },
-    "api/health.js": {
-      "maxDuration": 5
     }
   },
   "headers": [

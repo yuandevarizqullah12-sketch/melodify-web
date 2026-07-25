@@ -2,9 +2,10 @@
 // api/search.js — Vercel Serverless Function
 // GET /api/search?q=<query>
 //
-// The ONLY place YouTube's Data API key is used. The frontend never sees it.
-// Flow: normalize -> Firestore search-cache lookup -> on miss, call the
-// YouTube Data API, write `songs` + `search-cache`, return resolved songs.
+// The ONLY backend endpoint in this project, and the only place the YouTube
+// API key is used. Flow: normalize -> Firestore search-cache lookup -> on
+// miss, call the YouTube Data API, write `songs` + `search-cache`, return
+// resolved songs. The frontend never knows which path was taken.
 // =============================================================================
 
 import admin from "firebase-admin";
@@ -12,10 +13,8 @@ import admin from "firebase-admin";
 const MAX_QUERY_LENGTH = 100;
 const MAX_RESULTS = 20;
 
-// -----------------------------------------------------------------------------
-// Firebase Admin (idempotent — Vercel may reuse this module across invocations
-// on a warm lambda, so we must not call initializeApp() more than once).
-// -----------------------------------------------------------------------------
+// Idempotent — Vercel may reuse this module across invocations on a warm
+// lambda, so initializeApp() must not be called more than once.
 function getDb() {
   if (!admin.apps.length) {
     admin.initializeApp({
@@ -111,14 +110,14 @@ export default async function handler(req, res) {
   }
 
   // 1. Cache check — a concurrent request may have already resolved this
-  //    exact query since the client checked; save a YouTube quota call.
+  //    exact query since the client checked; this saves a YouTube quota call.
   try {
     const cacheSnap = await db.collection("search-cache").doc(normalized).get();
     if (cacheSnap.exists) {
       const cachedIds = cacheSnap.data().videoIds || [];
       const cachedSongs = await loadSongsByIds(db, cachedIds);
       if (cachedSongs.length > 0) {
-        res.status(200).json({ songs: cachedSongs, cached: true });
+        res.status(200).json({ songs: cachedSongs });
         return;
       }
     }
@@ -145,7 +144,7 @@ export default async function handler(req, res) {
     const videoIds = (searchData.items || []).map((item) => item.id && item.id.videoId).filter(Boolean);
 
     if (videoIds.length === 0) {
-      res.status(200).json({ songs: [], cached: false });
+      res.status(200).json({ songs: [] });
       return;
     }
 
@@ -195,7 +194,7 @@ export default async function handler(req, res) {
 
     await batch.commit();
 
-    res.status(200).json({ songs, cached: false });
+    res.status(200).json({ songs });
   } catch (err) {
     console.error("Search failed:", err);
     res.status(502).json({ error: "Search failed", detail: String((err && err.message) || err) });

@@ -52,11 +52,6 @@
       </div>
       <ul class="playlist-nav-list" id="playlistNavList"></ul>
     </div>
-
-    <button class="nav-btn nav-btn--settings" id="navSettingsBtn" type="button">
-      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.6 1z"/></svg>
-      <span>Settings</span>
-    </button>
   </aside>
 
   <!-- ===================== MAIN COLUMN ===================== -->
@@ -145,15 +140,16 @@
   <!-- ===================== SEARCH OVERLAY ===================== -->
   <div class="search-overlay" id="searchOverlay" aria-hidden="true">
     <div class="search-overlay-panel">
-      <div class="search-overlay-bar">
-        <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <form class="search-overlay-bar" id="searchForm">
+        <button class="icon-btn" id="searchSubmitBtn" type="submit" aria-label="Search">
+          <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
         <input type="text" id="searchInput" class="search-input" placeholder="Search songs or artists…" autocomplete="off" spellcheck="false">
         <button class="icon-btn" id="searchCloseBtn" type="button" aria-label="Close search">
           <svg class="icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
         </button>
-      </div>
+      </form>
       <div class="search-overlay-body" id="searchOverlayBody">
-        <ul class="suggestions-list" id="searchSuggestions"></ul>
         <div class="search-status" id="searchStatus"></div>
         <div class="song-list" id="searchResultsList"></div>
       </div>
@@ -316,10 +312,6 @@
       <svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-10-9.4C.4 7.7 2 4 5.6 4c2 0 3.6 1.1 4.4 2.7C10.8 5.1 12.4 4 14.4 4 18 4 19.6 7.7 18 11.1c-2.5 4.8-10 9.4-10 9.4Z"/></svg>
       <span>Favorites</span>
     </button>
-    <button class="tab-btn" id="mobileSettingsBtn" type="button">
-      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.6 1z"/></svg>
-      <span>Settings</span>
-    </button>
   </nav>
 
   <!-- ===================== PLAYLIST MODAL ===================== -->
@@ -336,24 +328,6 @@
       <form class="modal-new-playlist-form" id="playlistModalCreateForm">
         <input type="text" id="playlistModalNewName" placeholder="New playlist name" autocomplete="off" maxlength="60">
         <button type="submit" class="pill-btn pill-btn--primary">Create</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- ===================== SETTINGS MODAL ===================== -->
-  <div class="modal-overlay" id="settingsModal" aria-hidden="true">
-    <div class="modal-panel">
-      <div class="modal-header">
-        <h2>Settings</h2>
-        <button class="icon-btn" id="settingsCloseBtn" type="button" aria-label="Close">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
-        </button>
-      </div>
-      <form class="settings-form" id="settingsForm">
-        <label for="backendUrlInput">Backend URL</label>
-        <input type="text" id="backendUrlInput" placeholder="https://your-app.vercel.app" autocomplete="off">
-        <p class="settings-hint">Leave blank to use this same origin for <code>/api/search</code> and <code>/api/suggest</code>.</p>
-        <button type="submit" class="pill-btn pill-btn--primary">Save</button>
       </form>
     </div>
   </div>

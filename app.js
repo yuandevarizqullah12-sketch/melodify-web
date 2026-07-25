@@ -10,18 +10,10 @@
 //   CONFIG · ELEMENTS · STATE · STORAGE · UTIL · TOAST · ROUTING
 //   RENDER: rows/cards · RENDER: home · RENDER: favorites · RENDER: playlist
 //   PLAYLIST NAV · PLAYER CORE · YOUTUBE PLAYER · SEARCH · LYRICS
-//   NOW PLAYING SHEET · PLAYLIST MODAL · SETTINGS MODAL · WIRING · INIT
+//   NOW PLAYING SHEET · PLAYLIST MODAL · WIRING · INIT
 // =============================================================================
 
-import {
-  initFirebase,
-  searchSongs,
-  getSuggestions,
-  getSongsByIds,
-  fetchLyrics,
-  getBackendUrl,
-  setBackendUrl,
-} from "./services/api.js";
+import { initFirebase, searchSongs, getSongsByIds, fetchLyrics } from "./services/api.js";
 
 // ============================= CONFIG =======================================
 const STORAGE_KEYS = {
@@ -31,8 +23,6 @@ const STORAGE_KEYS = {
   volume: "melodify_volume",
 };
 const RECENT_MAX = 50;
-const SUGGEST_DEBOUNCE_MS = 250;
-const SEARCH_DEBOUNCE_MS = 450;
 
 // ============================= ELEMENTS ======================================
 // Every element is looked up once, defensively (missing elements resolve to
@@ -44,13 +34,11 @@ const elements = {
   navHomeBtn: document.getElementById("navHomeBtn"),
   navSearchBtn: document.getElementById("navSearchBtn"),
   navFavoritesBtn: document.getElementById("navFavoritesBtn"),
-  navSettingsBtn: document.getElementById("navSettingsBtn"),
   createPlaylistBtn: document.getElementById("createPlaylistBtn"),
   playlistNavList: document.getElementById("playlistNavList"),
 
   searchTriggerBtn: document.getElementById("searchTriggerBtn"),
   mobileSearchBtn: document.getElementById("mobileSearchBtn"),
-  mobileSettingsBtn: document.getElementById("mobileSettingsBtn"),
 
   viewContainer: document.getElementById("viewContainer"),
   homeView: document.getElementById("homeView"),
@@ -81,9 +69,9 @@ const elements = {
   playlistDetailEmptyHint: document.getElementById("playlistDetailEmptyHint"),
 
   searchOverlay: document.getElementById("searchOverlay"),
+  searchForm: document.getElementById("searchForm"),
   searchInput: document.getElementById("searchInput"),
   searchCloseBtn: document.getElementById("searchCloseBtn"),
-  searchSuggestions: document.getElementById("searchSuggestions"),
   searchStatus: document.getElementById("searchStatus"),
   searchResultsList: document.getElementById("searchResultsList"),
 
@@ -116,11 +104,6 @@ const elements = {
   playlistModalCreateForm: document.getElementById("playlistModalCreateForm"),
   playlistModalNewName: document.getElementById("playlistModalNewName"),
 
-  settingsModal: document.getElementById("settingsModal"),
-  settingsCloseBtn: document.getElementById("settingsCloseBtn"),
-  settingsForm: document.getElementById("settingsForm"),
-  backendUrlInput: document.getElementById("backendUrlInput"),
-
   toastContainer: document.getElementById("toastContainer"),
 
   youtubePlayerHost: document.getElementById("youtubePlayer"),
@@ -130,12 +113,10 @@ const elements = {
 function on(element, event, handler, options) {
   if (element) element.addEventListener(event, handler, options);
 }
-
 /** Every element carrying a "mirrored" control class (bottom bar + sheet). */
 function allWithClass(cls) {
   return Array.from(document.getElementsByClassName(cls));
 }
-
 /** Attaches a listener to every element of a mirrored control class. */
 function onAll(cls, event, handler, options) {
   allWithClass(cls).forEach((el) => on(el, event, handler, options));
@@ -216,13 +197,6 @@ function saveVolume() {
 }
 
 // ============================= UTIL ==========================================
-function debounce(fn, ms) {
-  let handle = null;
-  return (...args) => {
-    clearTimeout(handle);
-    handle = setTimeout(() => fn(...args), ms);
-  };
-}
 function formatDuration(totalSeconds) {
   const s = Math.max(0, Math.floor(totalSeconds || 0));
   const m = Math.floor(s / 60);
@@ -813,10 +787,10 @@ function setVolume(value) {
     if (document.activeElement !== slider) slider.value = String(state.volume);
   });
   allWithClass("volume-btn").forEach((btn) => {
-    const on1 = btn.querySelector(".icon-vol-on");
-    const off1 = btn.querySelector(".icon-vol-off");
-    if (on1) on1.hidden = state.muted;
-    if (off1) off1.hidden = !state.muted;
+    const onIcon = btn.querySelector(".icon-vol-on");
+    const offIcon = btn.querySelector(".icon-vol-off");
+    if (onIcon) onIcon.hidden = state.muted;
+    if (offIcon) offIcon.hidden = !state.muted;
   });
   saveVolume();
 }
@@ -878,6 +852,8 @@ function handleYtStateChange(event) {
 }
 
 // ============================= SEARCH =========================================
+// No suggestions, no debounce: the user types, then presses Enter or taps
+// the search button, and that's the only thing that triggers a search.
 function openSearchOverlay() {
   if (!elements.searchOverlay) return;
   elements.searchOverlay.classList.add("is-open");
@@ -895,38 +871,6 @@ function setSearchStatus(text, loading) {
   elements.searchStatus.classList.toggle("is-visible", !!text);
   elements.searchStatus.classList.toggle("is-loading", !!loading);
 }
-function renderSuggestions(suggestions) {
-  if (!elements.searchSuggestions) return;
-  elements.searchSuggestions.innerHTML = "";
-  suggestions.forEach((item) => {
-    const li = document.createElement("li");
-    li.className = "suggestion-item";
-    li.dataset.query = item.query;
-    li.innerHTML = `
-      <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <span>${escapeHtml(item.label)}</span>
-    `;
-    li.addEventListener("click", () => {
-      if (elements.searchInput) elements.searchInput.value = item.query;
-      runSearch(item.query);
-    });
-    elements.searchSuggestions.appendChild(li);
-  });
-}
-
-const debouncedSuggest = debounce(async (value) => {
-  if (!value.trim()) {
-    if (elements.searchSuggestions) elements.searchSuggestions.innerHTML = "";
-    return;
-  }
-  try {
-    renderSuggestions(await getSuggestions(value));
-  } catch {
-    if (elements.searchSuggestions) elements.searchSuggestions.innerHTML = "";
-  }
-}, SUGGEST_DEBOUNCE_MS);
-
-const debouncedSearch = debounce((value) => runSearch(value), SEARCH_DEBOUNCE_MS);
 
 async function runSearch(rawQuery) {
   const value = (rawQuery || "").trim();
@@ -947,7 +891,7 @@ async function runSearch(rawQuery) {
       renderSongList(elements.searchResultsList, songs, null, `Search: ${value}`);
     }
   } catch {
-    setSearchStatus("Search failed. Check your backend URL in Settings.", false);
+    setSearchStatus("Search failed. Please try again.", false);
   }
 }
 
@@ -1076,27 +1020,12 @@ function renderPlaylistModalList() {
   });
 }
 
-// ============================= SETTINGS MODAL =================================
-function openSettingsModal() {
-  if (elements.backendUrlInput) elements.backendUrlInput.value = getBackendUrl();
-  if (!elements.settingsModal) return;
-  elements.settingsModal.classList.add("is-open");
-  elements.settingsModal.setAttribute("aria-hidden", "false");
-}
-function closeSettingsModal() {
-  if (!elements.settingsModal) return;
-  elements.settingsModal.classList.remove("is-open");
-  elements.settingsModal.setAttribute("aria-hidden", "true");
-}
-
 // ============================= WIRING =========================================
 function wireNavigation() {
   on(elements.navHomeBtn, "click", () => setView("home"));
   on(elements.navFavoritesBtn, "click", () => setView("favorites"));
   on(elements.navSearchBtn, "click", openSearchOverlay);
-  on(elements.navSettingsBtn, "click", openSettingsModal);
   on(elements.mobileSearchBtn, "click", openSearchOverlay);
-  on(elements.mobileSettingsBtn, "click", openSettingsModal);
   document.querySelectorAll(".tab-btn[data-view]").forEach((btn) => {
     on(btn, "click", () => setView(btn.dataset.view));
   });
@@ -1132,18 +1061,12 @@ function wireSearch() {
   on(elements.searchOverlay, "click", (event) => {
     if (event.target === elements.searchOverlay) closeSearchOverlay();
   });
-  on(elements.searchInput, "input", (event) => {
-    const value = event.target.value;
-    debouncedSuggest(value);
-    debouncedSearch(value);
+  on(elements.searchForm, "submit", (event) => {
+    event.preventDefault();
+    runSearch(elements.searchInput ? elements.searchInput.value : "");
   });
   on(elements.searchInput, "keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      runSearch(elements.searchInput.value);
-    } else if (event.key === "Escape") {
-      closeSearchOverlay();
-    }
+    if (event.key === "Escape") closeSearchOverlay();
   });
 }
 
@@ -1161,19 +1084,6 @@ function wirePlaylistModal() {
       renderPlaylistModalList();
       showToast(`Created "${playlist.name}"`);
     }
-  });
-}
-
-function wireSettingsModal() {
-  on(elements.settingsCloseBtn, "click", closeSettingsModal);
-  on(elements.settingsModal, "click", (event) => {
-    if (event.target === elements.settingsModal) closeSettingsModal();
-  });
-  on(elements.settingsForm, "submit", (event) => {
-    event.preventDefault();
-    setBackendUrl(elements.backendUrlInput ? elements.backendUrlInput.value : "");
-    showToast("Settings saved");
-    closeSettingsModal();
   });
 }
 
@@ -1229,8 +1139,7 @@ function wirePlayerControls() {
     if (targetId) openPlaylistModal(targetId);
   });
   onAll("seek-bar", "input", (event) => {
-    const bar = event.currentTarget;
-    const pct = Number(bar.value) / 1000;
+    const pct = Number(event.currentTarget.value) / 1000;
     const time = pct * (state.duration || 0);
     allWithClass("current-time").forEach((el) => (el.textContent = formatDuration(time)));
   });
@@ -1321,7 +1230,6 @@ function wireKeyboardShortcuts() {
         closeNowPlayingSheet();
         closeLyricsPanel();
         closePlaylistModal();
-        closeSettingsModal();
         break;
       default:
         break;
@@ -1346,7 +1254,6 @@ function init() {
   wireQuickActions();
   wireSearch();
   wirePlaylistModal();
-  wireSettingsModal();
   wirePlaylistDetail();
   wireLyrics();
   wireNowPlayingSheet();
