@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Melodify — You're offline</title>
+<meta name="theme-color" content="#0d0c11" />
+<style>
+  :root {
+    --bg-base: #0d0c11;
+    --bg-raised: #161520;
+    --bg-panel: #1c1a27;
+    --text-primary: #f3f1ee;
+    --text-secondary: #a8a3b5;
+    --text-tertiary: #706c80;
+    --accent: #e7b646;
+    --grad-accent: linear-gradient(135deg, #e7b646 0%, #f0925a 100%);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+  }
+  .wrap { max-width: 380px; }
+  .mark {
+    width: 56px; height: 56px; margin: 0 auto 22px;
+    border-radius: 16px;
+    background: var(--grad-accent);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 28px rgba(231, 182, 70, 0.28);
+  }
+  .mark svg { width: 28px; height: 28px; color: #17140a; }
+  h1 { font-size: 20px; font-weight: 800; margin: 0 0 10px; }
+  p { font-size: 14px; line-height: 1.6; color: var(--text-secondary); margin: 0 0 26px; }
+  button {
+    background: var(--grad-accent); color: #1a1508; border: none;
+    font-size: 14px; font-weight: 700; padding: 12px 26px;
+    border-radius: 999px; cursor: pointer; font-family: inherit;
+  }
+  button:hover { filter: brightness(1.08); }
+  .hint { margin-top: 18px; font-size: 12.5px; color: var(--text-tertiary); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    </div>
+    <h1>You're offline</h1>
+    <p>Melodify needs a connection to search and stream new music. Anything you already opened while online may still be available.</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+    <div class="hint">Your favorites and playlists are saved on this device and will be here when you're back online.</div>
+  </div>
+</body>
+</html>

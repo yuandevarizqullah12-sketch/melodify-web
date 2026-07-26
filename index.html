@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Melodify — Music, uninterrupted</title>
 <meta name="description" content="Melodify is a premium music streaming experience." />
+<link rel="manifest" href="./manifest.webmanifest" />
+<meta name="theme-color" content="#0d0c11" />
+<meta name="background-color" content="#0d0c11" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Melodify" />
+<link rel="icon" href="./icons/icon-192.png" />
+<link rel="apple-touch-icon" href="./icons/icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -48,6 +57,14 @@
     --sidebar-w: 248px;
     --player-h: 92px;
     --header-h: 72px;
+
+    /* Shared card system (Section 1: unify card design everywhere) */
+    --card-w: 172px;
+    --card-w-mobile: 132px;
+    --card-w-small: 128px;
+    --card-pad: 14px;
+    --card-radius: var(--r-md);
+    --card-art-radius: var(--r-sm);
   }
 
   * { box-sizing: border-box; }
@@ -242,6 +259,22 @@
     background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 5px; color: var(--text-tertiary);
   }
 
+  .install-btn {
+    display: none;
+    align-items: center; gap: 8px;
+    padding: 9px 16px;
+    border-radius: var(--r-pill);
+    background: var(--bg-panel);
+    border: 1px solid var(--hairline-strong);
+    color: var(--text-primary);
+    font-size: 13px; font-weight: 600;
+    transition: background .18s var(--ease), transform .18s var(--ease), border-color .18s var(--ease);
+    flex-shrink: 0;
+  }
+  .install-btn svg { width: 16px; height: 16px; }
+  .install-btn:hover { background: var(--bg-panel-hover); border-color: var(--accent); transform: translateY(-1px); }
+  .install-btn.is-visible { display: inline-flex; }
+
   .content { flex: 1; overflow-y: auto; padding: 28px 32px calc(var(--player-h) + 40px); }
   .view { display: none; animation: fadeSlideIn .35s var(--ease); }
   .view.is-visible { display: block; }
@@ -254,6 +287,7 @@
   @keyframes pulseGlow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
   @keyframes artIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
   @keyframes textIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(10px) translateX(-50%); } to { opacity: 1; transform: translateY(0) translateX(-50%); } }
   .is-entering { animation: artIn .32s var(--ease); }
   .now-playing__text.is-entering,
   .fs-title.is-entering, .fs-artist.is-entering { animation: textIn .32s var(--ease); }
@@ -294,25 +328,34 @@
 
   /* ---------------- SECTIONS / GRIDS ---------------- */
   .section { margin-bottom: 40px; }
-  .section__head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
+  .section__head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
   .section__title { font-size: 20px; font-weight: 700; }
   .section__link { font-size: 12.5px; font-weight: 600; color: var(--text-tertiary); }
   .section__link:hover { color: var(--accent); }
 
-  .rail { display: flex; gap: 18px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
+  .rail { display: flex; gap: 18px; overflow-x: auto; overflow-y: hidden; padding: 2px 2px 10px; scroll-snap-type: x proximity; }
+
+  /* ---------------- SHARED CARD SYSTEM ----------------
+     One card component used by: Home rails, Search Results,
+     Favorites grid, Playlist grid, Library grid. Fixed dimensions
+     keep artwork ratio, spacing, and typography identical everywhere. */
   .card {
     scroll-snap-align: start;
-    flex: 0 0 172px;
+    flex: 0 0 var(--card-w);
+    width: var(--card-w);
     background: var(--bg-raised);
-    border-radius: var(--r-md);
-    padding: 14px;
+    border-radius: var(--card-radius);
+    padding: var(--card-pad);
     cursor: pointer;
     border: 1px solid transparent;
     transition: transform .22s var(--ease), background .22s var(--ease), border-color .22s var(--ease), box-shadow .22s var(--ease);
     position: relative;
+    display: flex;
+    flex-direction: column;
   }
-  .card:hover { transform: translateY(-5px); background: var(--bg-panel); border-color: var(--hairline-strong); box-shadow: var(--shadow-md); }
-  .card__art { position: relative; width: 100%; aspect-ratio: 1; border-radius: var(--r-sm); overflow: hidden; margin-bottom: 12px; background: var(--bg-panel); }
+  .card:hover, .card:focus-visible { transform: translateY(-5px); background: var(--bg-panel); border-color: var(--hairline-strong); box-shadow: var(--shadow-md); }
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .card__art { position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: var(--card-art-radius); overflow: hidden; margin-bottom: 12px; background: var(--bg-panel); flex-shrink: 0; }
   .card__art img { width: 100%; height: 100%; object-fit: cover; }
   .card__play {
     position: absolute; right: 8px; bottom: 8px;
@@ -325,12 +368,19 @@
   }
   .card:hover .card__play, .card:focus-within .card__play { opacity: 1; transform: none; }
   .card__play svg { width: 17px; height: 17px; margin-left: 2px; }
-  .card__title { font-size: 14px; font-weight: 600; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .card__subtitle { font-size: 12.5px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card__body { min-width: 0; }
+  .card__title { font-size: 14px; font-weight: 600; line-height: 1.35; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card__subtitle { font-size: 12.5px; line-height: 1.35; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card--playlist .card__art { background: linear-gradient(135deg, var(--violet), var(--accent)); display: flex; align-items: center; justify-content: center; }
   .card--playlist .card__art svg { width: 34px; height: 34px; color: rgba(20,17,28,0.55); }
 
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(172px, 1fr)); gap: 18px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--card-w), 1fr)); gap: 18px; }
+
+  /* Skeleton card — same footprint as .card so loading states never shift layout */
+  .card-skeleton { flex: 0 0 var(--card-w); width: var(--card-w); padding: var(--card-pad); }
+  .card-skeleton .skeleton-art { width: 100%; aspect-ratio: 1 / 1; border-radius: var(--card-art-radius); margin-bottom: 12px; }
+  .card-skeleton .skeleton-line { height: 12px; border-radius: 4px; margin-bottom: 6px; }
+  .card-skeleton .skeleton-line:last-child { width: 60%; height: 10px; margin-bottom: 0; }
 
   /* ---------------- SONG LIST (rows) ---------------- */
   .song-list { display: flex; flex-direction: column; }
@@ -345,13 +395,13 @@
     transition: background .16s var(--ease);
     position: relative;
   }
-  .song-row:hover { background: var(--bg-panel); }
+  .song-row:hover, .song-row:focus-within { background: var(--bg-panel); }
   .song-row.is-current .song-row__title { color: var(--accent); }
   .song-row__index { font-size: 13px; color: var(--text-tertiary); text-align: center; font-family: "IBM Plex Mono", monospace; flex-shrink: 0; }
   .song-row__index .icon-eq { display: none; }
   .song-row.is-current .song-row__index .icon-eq { display: inline-flex; }
   .song-row.is-current .song-row__index .idx-num { display: none; }
-  .song-row__main { display: flex; align-items: center; gap: 12px; min-width: 0; width: 100%; cursor: pointer; }
+  .song-row__main { display: flex; align-items: center; gap: 12px; min-width: 0; width: 100%; cursor: pointer; background: none; border: none; text-align: left; padding: 0; color: inherit; border-radius: var(--r-sm); }
   .song-row__art { width: 42px; height: 42px; border-radius: 6px; overflow: hidden; flex-shrink: 0; background: var(--bg-panel); }
   .song-row__art img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .song-row__text { min-width: 0; flex: 1; }
@@ -360,6 +410,7 @@
   .song-row__duration { font-size: 12.5px; color: var(--text-tertiary); font-family: "IBM Plex Mono", monospace; text-align: right; white-space: nowrap; flex-shrink: 0; }
   .song-row__actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; opacity: 0; transition: opacity .16s var(--ease); }
   .song-row:hover .song-row__actions, .song-row:focus-within .song-row__actions { opacity: 1; }
+  @media (hover: none) { .song-row__actions { opacity: 1; } }
 
   .icon-eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
   .icon-eq span { width: 3px; background: var(--accent); border-radius: 2px; animation: eq 1s ease-in-out infinite; }
@@ -391,6 +442,7 @@
     animation: shimmer 1.6s linear infinite;
     border-radius: var(--r-sm);
   }
+  @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; background: var(--bg-panel-hover); } }
 
   /* ============================================================
      SEARCH OVERLAY
@@ -405,7 +457,7 @@
     padding: 8vh 20px 20px;
   }
   .search-overlay.is-open { display: flex; animation: fadeIn .2s var(--ease); }
-  .search-panel { width: 100%; max-width: 720px; animation: scaleIn .25s var(--ease); }
+  .search-panel { width: 100%; max-width: 720px; animation: scaleIn .25s var(--ease); flex-shrink: 0; }
   .search-bar {
     display: flex; align-items: center; gap: 12px;
     background: var(--bg-raised); border: 1px solid var(--hairline-strong);
@@ -416,17 +468,19 @@
   .search-bar input {
     flex: 1; background: none; border: none; outline: none;
     color: var(--text-primary); font-size: 17px; font-family: inherit;
+    min-width: 0;
   }
   .search-bar input::placeholder { color: var(--text-tertiary); }
   .search-bar__submit {
     background: var(--grad-accent); color: #1a1508; font-weight: 700;
     font-size: 13px; padding: 9px 16px; border-radius: var(--r-pill); flex-shrink: 0;
   }
-  .search-close { margin-top: 16px; width: 100%; text-align: center; color: var(--text-tertiary); font-size: 13px; }
+  .search-close { margin-top: 16px; width: 100%; text-align: center; color: var(--text-tertiary); font-size: 13px; flex-shrink: 0; }
   .search-close kbd { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 5px; font-family: "IBM Plex Mono", monospace; }
 
-  .search-results { width: 100%; max-width: 720px; margin-top: 24px; overflow-y: auto; flex: 1; }
-  .search-results .song-list { background: var(--bg-raised); border-radius: var(--r-md); padding: 8px; }
+  .search-results { width: 100%; max-width: 720px; margin-top: 24px; overflow-y: auto; flex: 1; min-height: 0; }
+  .search-results .song-list, .search-results .grid { background: var(--bg-raised); border-radius: var(--r-md); padding: 8px; }
+  .search-results .grid { background: none; padding: 0; }
 
   /* ============================================================
      PLAYER BAR
@@ -518,11 +572,11 @@
     box-shadow: var(--shadow-lg);
   }
   .drawer.is-open { transform: translateX(0); }
-  .drawer__head { display: flex; align-items: center; justify-content: space-between; padding: 20px 20px 14px; border-bottom: 1px solid var(--hairline); }
+  .drawer__head { display: flex; align-items: center; justify-content: space-between; padding: 20px 20px 14px; border-bottom: 1px solid var(--hairline); flex-shrink: 0; }
   .drawer__title { font-size: 15px; font-weight: 700; }
   .drawer__body { flex: 1; overflow-y: auto; padding: 16px 20px 24px; }
 
-  .lyrics-line { font-size: 16px; line-height: 2; color: var(--text-tertiary); font-weight: 500; padding: 3px 0; transition: color .25s var(--ease), transform .25s var(--ease); scroll-margin: 40%; }
+  .lyrics-line { font-size: 16px; line-height: 2; color: var(--text-tertiary); font-weight: 500; padding: 3px 0; margin: 0; transition: color .25s var(--ease), transform .25s var(--ease); scroll-margin: 40%; }
   .lyrics-line.is-active { color: var(--text-primary); font-size: 18.5px; font-weight: 700; transform-origin: left; }
   .lyrics-plain { white-space: pre-line; line-height: 2; color: var(--text-secondary); font-size: 15px; }
 
@@ -564,7 +618,6 @@
     padding: 11px 18px; border-radius: var(--r-pill); font-size: 13px; font-weight: 500;
     box-shadow: var(--shadow-md); animation: toastIn .25s var(--ease);
   }
-  @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
   /* ============================================================
      MOBILE NAV / FULLSCREEN PLAYER
@@ -597,15 +650,15 @@
   .fs-art { width: 100%; aspect-ratio: 1; border-radius: 18px; overflow: hidden; box-shadow: var(--shadow-lg); margin-bottom: 32px; background: var(--bg-panel); }
   .fs-art img { width: 100%; height: 100%; object-fit: cover; }
   .fs-title-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 22px; }
-  .fs-title { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
-  .fs-artist { font-size: 14.5px; color: var(--text-tertiary); }
+  .fs-title { font-size: 22px; font-weight: 800; margin-bottom: 4px; overflow-wrap: anywhere; }
+  .fs-artist { font-size: 14.5px; color: var(--text-tertiary); overflow-wrap: anywhere; }
   .fs-progress { margin-bottom: 18px; }
   .fs-controls { display: flex; align-items: center; justify-content: center; gap: 22px; margin-bottom: 26px; }
   .fs-controls .icon-btn { width: 52px; height: 52px; }
   .fs-controls .play-toggle { width: 68px; height: 68px; background: #fff; color: #14121c; }
   .fs-controls .play-toggle svg { width: 26px; height: 26px; }
   .fs-controls .icon-btn svg { width: 26px; height: 26px; }
-  .fs-secondary { display: flex; align-items: center; justify-content: space-around; gap: 10px; }
+  .fs-secondary { display: flex; align-items: center; justify-content: space-around; gap: 10px; flex-wrap: wrap; }
   .fs-secondary .volume-group { width: 140px; }
 
   /* On mobile the body flows as a single column (art, then info,
@@ -627,7 +680,7 @@
       width: 100%; max-width: 1080px;
     }
     .fs-art { margin-bottom: 0; box-shadow: var(--shadow-lg), 0 0 0 1px var(--hairline); }
-    .fs-info { display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+    .fs-info { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; }
     .fs-title { font-size: 34px; }
     .fs-artist { font-size: 17px; }
     .fs-title-row { margin-bottom: 30px; }
@@ -641,6 +694,11 @@
   /* ============================================================
      RESPONSIVE
   ============================================================ */
+  /* Ultra-wide: cap content width so rows/cards don't stretch absurdly */
+  @media (min-width: 1600px) {
+    .content { max-width: 1680px; margin: 0 auto; }
+  }
+
   @media (max-width: 1024px) {
     :root { --sidebar-w: 84px; }
     .brand__name, .nav-item span:not(.sr-only), .nav-label, .playlist-list, .create-playlist-btn span { display: none; }
@@ -648,8 +706,13 @@
     .search-trigger { min-width: 160px; }
   }
 
+  @media (max-width: 900px) {
+    .install-btn span { display: none; }
+    .install-btn { padding: 9px; }
+  }
+
   @media (max-width: 768px) {
-    :root { --player-h: 72px; }
+    :root { --player-h: 72px; --card-w: var(--card-w-mobile); }
     #app { grid-template-columns: 1fr; grid-template-rows: 1fr var(--player-h) 60px; grid-template-areas: "main" "player" "mobilenav"; }
     .sidebar { display: none; }
     .content { padding: 20px 16px calc(var(--player-h) + 60px + 24px); }
@@ -659,7 +722,6 @@
     .search-trigger span, .search-trigger kbd { display: none; }
     .hero { padding: 26px 20px; }
     .hero__title { font-size: 24px; }
-    .card { flex: 0 0 132px; }
 
     .player-bar { grid-template-columns: 1fr auto; padding: 0 14px; cursor: pointer; }
     .player-center { display: none; }
@@ -688,17 +750,20 @@
   }
 
   @media (max-width: 480px) {
-    .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; }
-    .card { flex: 0 0 128px; padding: 10px; }
+    :root { --card-w: var(--card-w-small); }
+    .grid { gap: 14px; }
+    .card { padding: 10px; }
     .hero__title { font-size: 21px; }
     .btn { padding: 11px 18px; font-size: 13px; }
+    .song-row { grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; }
+    .song-row__duration { display: none; }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+    *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
   }
 
-  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; padding: 0; margin: -1px; }
 </style>
 </head>
 <body>
@@ -752,10 +817,14 @@
     <header class="header" id="header">
       <h1 class="header__title" id="header-title">Good evening</h1>
       <div class="header__actions">
+        <button class="install-btn" type="button" data-action="install-app" id="install-btn" aria-label="Install Melodify app">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13M6 11l6 6 6-6"/><path d="M5 20h14"/></svg>
+          <span>Install app</span>
+        </button>
         <button class="search-trigger" type="button" data-action="search-open" aria-label="Open search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
           <span>Search songs, artists…</span>
-          <kbd>/</kbd>
+          <kbd aria-hidden="true">/</kbd>
         </button>
       </div>
     </header>
@@ -830,15 +899,15 @@
       <!-- ---------------- PLAYLIST DETAIL ---------------- -->
       <section class="view" id="view-playlist" data-view="playlist">
         <div class="section__head" style="align-items:center;">
-          <div style="display:flex; align-items:center; gap:18px;">
-            <div class="playlist-row__dot" style="width:64px;height:64px;border-radius:14px;font-size:24px;" id="playlist-detail-cover">P</div>
-            <div>
+          <div style="display:flex; align-items:center; gap:18px; min-width:0;">
+            <div class="playlist-row__dot" style="width:64px;height:64px;border-radius:14px;font-size:24px;flex-shrink:0;" id="playlist-detail-cover" aria-hidden="true">P</div>
+            <div style="min-width:0;">
               <div class="nav-label" style="padding:0 0 4px;">Playlist</div>
-              <h2 class="header__title" id="playlist-detail-name" style="font-size:26px;">Playlist</h2>
+              <h2 class="header__title" id="playlist-detail-name" style="font-size:26px; overflow-wrap:anywhere;">Playlist</h2>
               <div class="song-row__artist" id="playlist-detail-count">0 songs</div>
             </div>
           </div>
-          <div style="display:flex; gap:8px;">
+          <div style="display:flex; gap:8px; flex-shrink:0;">
             <button class="icon-btn" type="button" data-action="rename-playlist" aria-label="Rename playlist">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
             </button>
@@ -866,35 +935,35 @@
       <div class="now-playing__text" id="np-text">
         <div class="now-playing__empty">Nothing playing yet</div>
       </div>
-      <button class="icon-btn favorite-btn" type="button" data-action="favorite" aria-label="Add to favorites" style="flex-shrink:0;">
+      <button class="icon-btn favorite-btn" type="button" data-action="favorite" aria-label="Add to favorites" style="flex-shrink:0;" disabled>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 10-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 000-7.8z"/></svg>
       </button>
     </div>
 
     <div class="player-center">
       <div class="player-controls">
-        <button class="icon-btn" type="button" data-action="shuffle" aria-label="Shuffle">
+        <button class="icon-btn" type="button" data-action="shuffle" aria-label="Shuffle" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M4 4l5 5M15 15l6 6"/></svg>
         </button>
-        <button class="icon-btn" type="button" data-action="prev" aria-label="Previous">
+        <button class="icon-btn" type="button" data-action="prev" aria-label="Previous" disabled>
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zM20 6l-10 6 10 6z"/></svg>
         </button>
-        <button class="icon-btn play-toggle" type="button" data-action="play-pause" aria-label="Play">
+        <button class="icon-btn play-toggle" type="button" data-action="play-pause" aria-label="Play" disabled>
           <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
           <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
           <svg class="icon-loading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none;"><circle cx="12" cy="12" r="9" stroke-opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg>
         </button>
-        <button class="icon-btn" type="button" data-action="next" aria-label="Next">
+        <button class="icon-btn" type="button" data-action="next" aria-label="Next" disabled>
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM4 6l10 6-10 6z"/></svg>
         </button>
-        <button class="icon-btn" type="button" data-action="repeat" aria-label="Repeat">
+        <button class="icon-btn" type="button" data-action="repeat" aria-label="Repeat" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2l4 4-4 4M3 11V9a4 4 0 014-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 01-4 4H3"/></svg>
           <span class="repeat-one-dot sr-only">one</span>
         </button>
       </div>
       <div class="progress-row">
         <time class="mono" id="time-current">0:00</time>
-        <input class="seek" id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek" />
+        <input class="seek" id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek" disabled />
         <time class="mono" id="time-duration">0:00</time>
       </div>
     </div>
@@ -958,37 +1027,37 @@
       <div class="fs-art"><img id="fs-art" alt="" /></div>
       <div class="fs-info">
         <div class="fs-title-row">
-          <div>
+          <div style="min-width:0;">
             <div class="fs-title" id="fs-title">—</div>
             <div class="fs-artist" id="fs-artist">—</div>
           </div>
-          <button class="icon-btn favorite-btn" type="button" data-action="favorite" aria-label="Add to favorites">
+          <button class="icon-btn favorite-btn" type="button" data-action="favorite" aria-label="Add to favorites" style="flex-shrink:0;" disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 10-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 000-7.8z"/></svg>
           </button>
         </div>
         <div class="fs-progress">
           <div class="progress-row">
             <time class="mono" id="fs-time-current">0:00</time>
-            <input class="seek" id="fs-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek" />
+            <input class="seek" id="fs-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek" disabled />
             <time class="mono" id="fs-time-duration">0:00</time>
           </div>
         </div>
         <div class="fs-controls">
-          <button class="icon-btn" type="button" data-action="shuffle" aria-label="Shuffle">
+          <button class="icon-btn" type="button" data-action="shuffle" aria-label="Shuffle" disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M4 4l5 5M15 15l6 6"/></svg>
           </button>
-          <button class="icon-btn" type="button" data-action="prev" aria-label="Previous">
+          <button class="icon-btn" type="button" data-action="prev" aria-label="Previous" disabled>
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zM20 6l-10 6 10 6z"/></svg>
           </button>
-          <button class="icon-btn play-toggle" type="button" data-action="play-pause" aria-label="Play">
+          <button class="icon-btn play-toggle" type="button" data-action="play-pause" aria-label="Play" disabled>
             <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
             <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
             <svg class="icon-loading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none;"><circle cx="12" cy="12" r="9" stroke-opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg>
           </button>
-          <button class="icon-btn" type="button" data-action="next" aria-label="Next">
+          <button class="icon-btn" type="button" data-action="next" aria-label="Next" disabled>
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM4 6l10 6-10 6z"/></svg>
           </button>
-          <button class="icon-btn" type="button" data-action="repeat" aria-label="Repeat">
+          <button class="icon-btn" type="button" data-action="repeat" aria-label="Repeat" disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2l4 4-4 4M3 11V9a4 4 0 014-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 01-4 4H3"/></svg>
           </button>
         </div>
@@ -996,7 +1065,7 @@
           <button class="icon-btn" type="button" data-action="lyrics-toggle" aria-label="Lyrics">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v13H8l-4 4z"/><path d="M8 9h8M8 13h5"/></svg>
           </button>
-          <button class="icon-btn" type="button" data-action="fs-add-to-playlist" aria-label="Add to playlist">
+          <button class="icon-btn" type="button" data-action="fs-add-to-playlist" aria-label="Add to playlist" disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
           </button>
           <div class="volume-group">
@@ -1041,19 +1110,19 @@
     <div class="search-panel">
       <div class="search-bar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input id="search-input" type="text" placeholder="Search for songs or artists…" aria-label="Search" autocomplete="off" />
+        <input id="search-input" type="text" placeholder="Search for songs or artists…" aria-label="Search for songs or artists" autocomplete="off" />
         <button class="search-bar__submit" type="button" data-action="search-submit">Search</button>
       </div>
       <div class="search-close">Press <kbd>Esc</kbd> to close</div>
     </div>
-    <div class="search-results" id="search-results"></div>
+    <div class="search-results" id="search-results" aria-live="polite"></div>
   </div>
 
   <!-- ============================================================
        MODAL + TOASTS
   ============================================================ -->
   <div class="modal-backdrop" id="modal-backdrop"></div>
-  <div class="toast-stack" id="toast-stack"></div>
+  <div class="toast-stack" id="toast-stack" aria-live="polite" role="status"></div>
 
   <div id="yt-player-container"><div id="yt-player"></div></div>
 
@@ -1086,6 +1155,7 @@ const el = {
   headerTitle: $("#header-title"),
   content: $("#content"),
   sidebarPlaylists: $("#sidebar-playlists"),
+  installBtn: $("#install-btn"),
 
   homeGreeting: $("#hero-greeting"),
   homeRecent: $("#home-recent-wrap"),
@@ -1303,6 +1373,7 @@ function loadAndPlay(song) {
   });
   if (state.activeDrawer === "lyrics") loadLyricsForCurrent();
   else state.lyrics = null;
+  updateMediaSession(song);
 }
 function togglePlayPause() {
   if (!state.currentSong) return;
@@ -1411,6 +1482,24 @@ function toggleFavorite(song) {
 }
 
 /* ============================================================
+   MEDIA SESSION (lock-screen / OS-level playback controls)
+============================================================ */
+function updateMediaSession(song) {
+  if (!("mediaSession" in navigator)) return;
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: song.title,
+      artist: song.artist,
+      artwork: song.thumbnail ? [{ src: song.thumbnail, sizes: "512x512", type: "image/jpeg" }] : [],
+    });
+    navigator.mediaSession.setActionHandler("play", () => togglePlayPause());
+    navigator.mediaSession.setActionHandler("pause", () => togglePlayPause());
+    navigator.mediaSession.setActionHandler("previoustrack", () => playPrevious());
+    navigator.mediaSession.setActionHandler("nexttrack", () => playNext(true));
+  } catch {}
+}
+
+/* ============================================================
    PLAYLISTS
 ============================================================ */
 function createPlaylist(name) {
@@ -1459,14 +1548,19 @@ function persistPlaylists() {
 /* ============================================================
    MODAL SYSTEM
 ============================================================ */
+let lastFocusedBeforeModal = null;
 function openModal({ title, body = "", input = null, actions }) {
+  lastFocusedBeforeModal = document.activeElement;
   el.modalBackdrop.innerHTML = "";
   const modal = document.createElement("div");
   modal.className = "modal";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-labelledby", "modal-title");
   modal.innerHTML = `
-    <div class="modal__title">${escapeHtml(title)}</div>
+    <div class="modal__title" id="modal-title">${escapeHtml(title)}</div>
     ${body ? `<div class="modal__body">${escapeHtml(body)}</div>` : ""}
-    ${input ? `<input class="modal__input" id="modal-input" type="text" value="${escapeHtml(input.value || "")}" placeholder="${escapeHtml(input.placeholder || "")}" />` : ""}
+    ${input ? `<input class="modal__input" id="modal-input" type="text" value="${escapeHtml(input.value || "")}" placeholder="${escapeHtml(input.placeholder || "")}" aria-label="${escapeHtml(input.placeholder || title)}" />` : ""}
     <div class="modal__actions"></div>
   `;
   const actionsWrap = $(".modal__actions", modal);
@@ -1486,10 +1580,13 @@ function openModal({ title, body = "", input = null, actions }) {
   el.modalBackdrop.classList.add("is-open");
   const firstInput = $("#modal-input", modal);
   if (firstInput) { firstInput.focus(); firstInput.select(); }
+  else { const firstBtn = $(".modal__actions button", modal); firstBtn?.focus(); }
 }
 function closeModal() {
   el.modalBackdrop.classList.remove("is-open");
   el.modalBackdrop.innerHTML = "";
+  if (lastFocusedBeforeModal && document.contains(lastFocusedBeforeModal)) lastFocusedBeforeModal.focus();
+  lastFocusedBeforeModal = null;
 }
 el.modalBackdrop.addEventListener("click", (e) => {
   if (e.target === el.modalBackdrop) closeModal();
@@ -1540,14 +1637,17 @@ function promptAddToPlaylist(song) {
     });
     return;
   }
+  lastFocusedBeforeModal = document.activeElement;
   el.modalBackdrop.innerHTML = "";
   const modal = document.createElement("div");
   modal.className = "modal";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
   modal.innerHTML = `
     <div class="modal__title">Add to playlist</div>
     <div class="modal__body">Choose a playlist for "${escapeHtml(song.title)}"</div>
     <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:16px; max-height:260px; overflow-y:auto;">
-      ${state.playlists.map((p) => `<button class="playlist-row" type="button" data-playlist-id="${p.id}" style="background:var(--bg-panel);"><span class="playlist-row__dot">${escapeHtml(p.name[0] || "P").toUpperCase()}</span><span>${escapeHtml(p.name)}</span></button>`).join("")}
+      ${state.playlists.map((p) => `<button class="playlist-row" type="button" data-playlist-id="${p.id}" style="background:var(--bg-panel);"><span class="playlist-row__dot" aria-hidden="true">${escapeHtml(p.name[0] || "P").toUpperCase()}</span><span>${escapeHtml(p.name)}</span></button>`).join("")}
     </div>
     <div class="modal__actions"><button class="btn btn-ghost" type="button" data-close>Cancel</button></div>
   `;
@@ -1558,6 +1658,7 @@ function promptAddToPlaylist(song) {
   });
   el.modalBackdrop.appendChild(modal);
   el.modalBackdrop.classList.add("is-open");
+  $(".playlist-row", modal)?.focus();
 }
 
 /* ============================================================
@@ -1578,8 +1679,9 @@ function renderIcon(name) {
 function emptyState({ icon = "playlist", title, body, actionLabel, actionFn }) {
   const wrap = document.createElement("div");
   wrap.className = "empty-state";
+  wrap.setAttribute("role", "status");
   wrap.innerHTML = `
-    <div class="empty-state__icon">${renderIcon(icon)}</div>
+    <div class="empty-state__icon" aria-hidden="true">${renderIcon(icon)}</div>
     <div class="empty-state__title">${escapeHtml(title)}</div>
     <div class="empty-state__body">${escapeHtml(body)}</div>
   `;
@@ -1594,6 +1696,19 @@ function emptyState({ icon = "playlist", title, body, actionLabel, actionFn }) {
   return wrap;
 }
 
+/* Shared skeleton card grid/rail used by every collection while loading,
+   so nothing pops or resizes once real data arrives (Section 6: perf/CLS). */
+function skeletonCards(count = 6) {
+  const nodes = [];
+  for (let i = 0; i < count; i++) {
+    const card = document.createElement("div");
+    card.className = "card card-skeleton";
+    card.innerHTML = `<div class="skeleton skeleton-art"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div>`;
+    nodes.push(card);
+  }
+  return nodes;
+}
+
 function songCard(song, { context = "generic" } = {}) {
   const card = document.createElement("div");
   card.className = "card";
@@ -1603,13 +1718,15 @@ function songCard(song, { context = "generic" } = {}) {
   card.setAttribute("aria-label", `Play ${song.title} by ${song.artist}`);
   card.innerHTML = `
     <div class="card__art">
-      <img src="${escapeHtml(song.thumbnail || "")}" alt="" loading="lazy" />
-      <button class="card__play" type="button" data-action="play-card" aria-label="Play ${escapeHtml(song.title)}">
+      <img src="${escapeHtml(song.thumbnail || "")}" alt="" loading="lazy" decoding="async" />
+      <button class="card__play" type="button" data-action="play-card" aria-label="Play ${escapeHtml(song.title)}" tabindex="-1">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
       </button>
     </div>
-    <div class="card__title">${escapeHtml(song.title)}</div>
-    <div class="card__subtitle">${escapeHtml(song.artist)}</div>
+    <div class="card__body">
+      <div class="card__title">${escapeHtml(song.title)}</div>
+      <div class="card__subtitle">${escapeHtml(song.artist)}</div>
+    </div>
   `;
   card.addEventListener("click", () => playFromCollection(song, context));
   card.addEventListener("keydown", (e) => {
@@ -1625,9 +1742,11 @@ function playlistCard(playlist) {
   card.setAttribute("role", "button");
   card.setAttribute("aria-label", `Open ${playlist.name}`);
   card.innerHTML = `
-    <div class="card__art">${renderIcon("playlist")}</div>
-    <div class="card__title">${escapeHtml(playlist.name)}</div>
-    <div class="card__subtitle">${playlist.songIds.length} song${playlist.songIds.length === 1 ? "" : "s"}</div>
+    <div class="card__art" aria-hidden="true">${renderIcon("playlist")}</div>
+    <div class="card__body">
+      <div class="card__title">${escapeHtml(playlist.name)}</div>
+      <div class="card__subtitle">${playlist.songIds.length} song${playlist.songIds.length === 1 ? "" : "s"}</div>
+    </div>
   `;
   const open = () => navigateTo("playlist", playlist.id);
   card.addEventListener("click", open);
@@ -1642,26 +1761,26 @@ function songRow(song, index, { context = [], showRemove = false, playlistId = n
   if (state.currentSong && state.currentSong.id === song.id) row.classList.add("is-current");
   const fav = isFavorite(song.id);
   row.innerHTML = `
-    <div class="song-row__index">
+    <div class="song-row__index" aria-hidden="true">
       <span class="idx-num">${index + 1}</span>
-      <span class="icon-eq" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span class="icon-eq"><span></span><span></span><span></span></span>
     </div>
-    <div class="song-row__main" data-action="play-row" tabindex="0" role="button" aria-label="Play ${escapeHtml(song.title)}">
-      <div class="song-row__art"><img src="${escapeHtml(song.thumbnail || "")}" alt="" loading="lazy" /></div>
+    <button class="song-row__main" type="button" data-action="play-row" aria-label="Play ${escapeHtml(song.title)} by ${escapeHtml(song.artist)}">
+      <div class="song-row__art"><img src="${escapeHtml(song.thumbnail || "")}" alt="" loading="lazy" decoding="async" /></div>
       <div class="song-row__text">
         <div class="song-row__title">${escapeHtml(song.title)}</div>
         <div class="song-row__artist">${escapeHtml(song.artist)}</div>
       </div>
-    </div>
+    </button>
     <div class="song-row__duration">${song.durationSeconds ? formatTime(song.durationSeconds) : ""}</div>
     <div class="song-row__actions">
       <button class="icon-btn ${fav ? "is-active" : ""}" type="button" data-action="favorite-row" aria-label="${fav ? "Remove from favorites" : "Add to favorites"}">
         <svg viewBox="0 0 24 24" fill="${fav ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 10-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 000-7.8z"/></svg>
       </button>
-      <button class="icon-btn" type="button" data-action="add-to-playlist" aria-label="Add to playlist">
+      <button class="icon-btn" type="button" data-action="add-to-playlist" aria-label="Add ${escapeHtml(song.title)} to playlist">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
       </button>
-      <button class="icon-btn" type="button" data-action="queue-add" aria-label="Add to queue">
+      <button class="icon-btn" type="button" data-action="queue-add" aria-label="Add ${escapeHtml(song.title)} to queue">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h10M18 15v6M15 18h6"/></svg>
       </button>
     </div>
@@ -1674,7 +1793,7 @@ function songRow(song, index, { context = [], showRemove = false, playlistId = n
     removeBtn.className = "icon-btn";
     removeBtn.type = "button";
     removeBtn.dataset.action = "remove-from-playlist";
-    removeBtn.setAttribute("aria-label", "Remove from playlist");
+    removeBtn.setAttribute("aria-label", `Remove ${song.title} from playlist`);
     removeBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
     $(".song-row__actions", row).appendChild(removeBtn);
   }
@@ -1688,9 +1807,10 @@ function songList(songs, opts = {}) {
   return wrap;
 }
 
-function rail(nodes) {
+function rail(nodes, label) {
   const wrap = document.createElement("div");
   wrap.className = "rail";
+  if (label) wrap.setAttribute("aria-label", label);
   nodes.forEach((n) => wrap.appendChild(n));
   return wrap;
 }
@@ -1711,7 +1831,7 @@ function renderHome() {
 
   el.homeRecent.innerHTML = "";
   if (state.recentlyPlayed.length) {
-    el.homeRecent.appendChild(rail(state.recentlyPlayed.slice(0, 12).map((s) => songCard(s, { context: "recent" }))));
+    el.homeRecent.appendChild(rail(state.recentlyPlayed.slice(0, 12).map((s) => songCard(s, { context: "recent" })), "Recently played"));
   } else {
     el.homeRecent.appendChild(emptyState({
       icon: "recent",
@@ -1724,7 +1844,7 @@ function renderHome() {
 
   el.homeFavorites.innerHTML = "";
   if (state.favorites.length) {
-    el.homeFavorites.appendChild(rail(state.favorites.slice(0, 12).map((s) => songCard(s, { context: "favorites" }))));
+    el.homeFavorites.appendChild(rail(state.favorites.slice(0, 12).map((s) => songCard(s, { context: "favorites" })), "Favorites"));
   } else {
     el.homeFavorites.appendChild(emptyState({
       icon: "heart",
@@ -1737,7 +1857,7 @@ function renderHome() {
 
   el.homePlaylists.innerHTML = "";
   if (state.playlists.length) {
-    el.homePlaylists.appendChild(rail(state.playlists.slice(0, 12).map(playlistCard)));
+    el.homePlaylists.appendChild(rail(state.playlists.slice(0, 12).map(playlistCard), "Your playlists"));
   } else {
     el.homePlaylists.appendChild(emptyState({
       icon: "playlist",
@@ -1752,7 +1872,7 @@ function renderHome() {
 function renderFavorites() {
   el.favoritesWrap.innerHTML = "";
   if (state.favorites.length) {
-    el.favoritesWrap.appendChild(songList(state.favorites, { context: state.favorites }));
+    el.favoritesWrap.appendChild(grid(state.favorites.map((s) => songCard(s, { context: "favorites" }))));
   } else {
     el.favoritesWrap.appendChild(emptyState({
       icon: "heart",
@@ -1808,7 +1928,8 @@ function renderSidebarPlaylists() {
     btn.type = "button";
     btn.dataset.action = "open-playlist";
     btn.dataset.playlistId = pl.id;
-    btn.innerHTML = `<span class="playlist-row__dot">${escapeHtml((pl.name[0] || "P").toUpperCase())}</span><span>${escapeHtml(pl.name)}</span>`;
+    btn.setAttribute("aria-current", state.view === "playlist" && state.currentPlaylistId === pl.id ? "page" : "false");
+    btn.innerHTML = `<span class="playlist-row__dot" aria-hidden="true">${escapeHtml((pl.name[0] || "P").toUpperCase())}</span><span>${escapeHtml(pl.name)}</span>`;
     li.appendChild(btn);
     el.sidebarPlaylists.appendChild(li);
   });
@@ -1819,18 +1940,7 @@ function renderSearchResults() {
   wrap.innerHTML = "";
 
   if (state.searchLoading) {
-    const skeleton = document.createElement("div");
-    skeleton.className = "song-list";
-    skeleton.style.background = "var(--bg-raised)";
-    skeleton.style.borderRadius = "14px";
-    skeleton.style.padding = "8px";
-    for (let i = 0; i < 6; i++) {
-      const row = document.createElement("div");
-      row.style.cssText = "display:flex;align-items:center;gap:14px;padding:10px 12px;";
-      row.innerHTML = `<div class="skeleton" style="width:42px;height:42px;border-radius:6px;"></div><div style="flex:1;display:flex;flex-direction:column;gap:6px;"><div class="skeleton" style="width:55%;height:12px;"></div><div class="skeleton" style="width:35%;height:10px;"></div></div>`;
-      skeleton.appendChild(row);
-    }
-    wrap.appendChild(skeleton);
+    wrap.appendChild(grid(skeletonCards(8)));
     return;
   }
 
@@ -1863,7 +1973,9 @@ function renderSearchResults() {
     return;
   }
 
-  wrap.appendChild(songList(state.searchResults, { context: state.searchResults }));
+  // Same shared card component as every other collection (Section 1 & 2):
+  // fixed square artwork, identical spacing/typography, no layout jump.
+  wrap.appendChild(grid(state.searchResults.map((s) => songCard(s, { context: "search" }))));
 }
 
 let lastChromeSongId = null;
@@ -1879,8 +1991,10 @@ function renderPlayerChrome() {
 
   if (song) {
     el.npArt.src = song.thumbnail || "";
+    el.npArt.alt = `${song.title} artwork`;
     el.npText.innerHTML = `<div class="now-playing__title">${escapeHtml(song.title)}</div><div class="now-playing__artist">${escapeHtml(song.artist)}</div>`;
     el.fsArt.src = song.thumbnail || "";
+    el.fsArt.alt = `${song.title} artwork`;
     el.fsTitle.textContent = song.title;
     el.fsArtist.textContent = song.artist;
     document.documentElement.style.setProperty("--fs-bg", `url("${song.thumbnail || ""}")`);
@@ -1898,6 +2012,7 @@ function renderPlayerChrome() {
     }
   } else {
     el.npArt.src = "";
+    el.npArt.alt = "";
     el.npText.innerHTML = `<div class="now-playing__empty">Nothing playing yet</div>`;
     el.fsTitle.textContent = "—";
     el.fsArtist.textContent = "—";
@@ -1908,6 +2023,7 @@ function renderPlayerChrome() {
     const active = song && isFavorite(song.id);
     btn.classList.toggle("is-active", !!active);
     btn.disabled = !song;
+    btn.setAttribute("aria-label", active ? "Remove from favorites" : "Add to favorites");
     btn.querySelector("svg").setAttribute("fill", active ? "currentColor" : "none");
   });
 
@@ -1923,15 +2039,20 @@ function renderPlayerChrome() {
     btn.setAttribute("aria-label", state.isPlaying ? "Pause" : "Play");
   });
 
-  $$('[data-action="shuffle"]').forEach((b) => b.classList.toggle("is-active", state.shuffle));
+  $$('[data-action="shuffle"]').forEach((b) => {
+    b.classList.toggle("is-active", state.shuffle);
+    b.setAttribute("aria-pressed", String(state.shuffle));
+  });
   $$('[data-action="repeat"]').forEach((b) => {
     b.classList.toggle("is-active", state.repeat !== "off");
+    b.setAttribute("aria-label", state.repeat === "one" ? "Repeat one" : state.repeat === "all" ? "Repeat all" : "Repeat");
     b.style.position = "relative";
     let dot = b.querySelector(".repeat-mode-dot");
     if (state.repeat === "one") {
       if (!dot) {
         dot = document.createElement("span");
         dot.className = "repeat-mode-dot";
+        dot.setAttribute("aria-hidden", "true");
         dot.style.cssText = "position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--accent);";
         b.appendChild(dot);
       }
@@ -1940,11 +2061,12 @@ function renderPlayerChrome() {
 
   $$('[data-action="prev"], [data-action="next"]').forEach((b) => (b.disabled = !state.queue.length || state.isBuffering));
   $$('[data-action="shuffle"], [data-action="repeat"]').forEach((b) => (b.disabled = !song || state.isBuffering));
+  $$('[data-action="fs-add-to-playlist"]').forEach((b) => (b.disabled = !song));
   [el.seek, el.fsSeek].forEach((bar) => (bar.disabled = !song || state.isBuffering));
 
   syncVolumeUI();
   document.querySelectorAll(".song-row").forEach((row) => {
-    row.classList.toggle("is-current", song && row.dataset.songId === song.id);
+    row.classList.toggle("is-current", !!(song && row.dataset.songId === song.id));
   });
 }
 
@@ -2017,31 +2139,37 @@ function renderLyricsBody() {
   lyricsLineNodes = [];
   lastLyricsIndex = -1;
   if (state.lyricsLoading) {
+    const wrap = document.createElement("div");
+    wrap.setAttribute("aria-busy", "true");
+    wrap.setAttribute("aria-label", "Loading lyrics");
     for (let i = 0; i < 8; i++) {
       const line = document.createElement("div");
       line.className = "skeleton";
-      line.style.cssText = `height:14px; width:${60 + Math.random() * 30}%; margin-bottom:14px;`;
-      el.lyricsBody.appendChild(line);
+      line.style.cssText = `height:14px; width:${60 + ((i * 37) % 30)}%; margin-bottom:14px;`;
+      wrap.appendChild(line);
     }
+    el.lyricsBody.appendChild(wrap);
     return;
   }
   if (!state.lyrics || (!state.lyrics.synced?.length && !state.lyrics.plain)) {
     el.lyricsBody.appendChild(emptyState({
       icon: "lyrics",
-      title: "No lyrics found",
+      title: "Lyrics not found",
       body: "We couldn't find lyrics for this track.",
     }));
     return;
   }
   if (state.lyrics.synced?.length) {
+    const frag = document.createDocumentFragment();
     state.lyrics.synced.forEach((line, i) => {
       const p = document.createElement("p");
       p.className = "lyrics-line";
       p.dataset.lineIndex = String(i);
       p.textContent = line.text || "♪";
-      el.lyricsBody.appendChild(p);
+      frag.appendChild(p);
       lyricsLineNodes.push(p);
     });
+    el.lyricsBody.appendChild(frag);
   } else {
     const p = document.createElement("div");
     p.className = "lyrics-plain";
@@ -2091,8 +2219,16 @@ function navigateTo(view, playlistId = null) {
   state.view = view;
   state.currentPlaylistId = playlistId;
   $$(".view").forEach((v) => v.classList.toggle("is-visible", v.dataset.view === view));
-  $$('.nav-item[data-action="nav"]').forEach((b) => b.classList.toggle("is-active", b.dataset.view === view));
-  $$('.mobile-nav__item[data-action="nav"]').forEach((b) => b.classList.toggle("is-active", b.dataset.view === view));
+  $$('.nav-item[data-action="nav"]').forEach((b) => {
+    const active = b.dataset.view === view;
+    b.classList.toggle("is-active", active);
+    if (active) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
+  $$('.mobile-nav__item[data-action="nav"]').forEach((b) => {
+    const active = b.dataset.view === view;
+    b.classList.toggle("is-active", active);
+    if (active) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
   const titles = { home: greetingForNow(), favorites: "Favorites", library: "Your library", playlist: "Playlist" };
   el.headerTitle.textContent = titles[view] || "Melodify";
   el.content.scrollTop = 0;
@@ -2140,6 +2276,7 @@ function playFromCollection(song, contextKey) {
   const map = {
     recent: state.recentlyPlayed,
     favorites: state.favorites,
+    search: state.searchResults,
     generic: [song],
   };
   const context = map[contextKey] || [song];
@@ -2170,6 +2307,8 @@ function openDrawer(name) {
   el.queueDrawer.classList.toggle("is-open", name === "queue");
   el.lyricsDrawer.setAttribute("aria-hidden", String(name !== "lyrics"));
   el.queueDrawer.setAttribute("aria-hidden", String(name !== "queue"));
+  $$('[data-action="lyrics-toggle"]').forEach((b) => b.setAttribute("aria-expanded", String(name === "lyrics")));
+  $$('[data-action="queue-toggle"]').forEach((b) => b.setAttribute("aria-expanded", String(name === "queue")));
   if (name === "lyrics") loadLyricsForCurrent();
   if (name === "queue") renderQueueDrawer();
 }
@@ -2179,6 +2318,7 @@ function closeDrawers() {
   el.queueDrawer.classList.remove("is-open");
   el.lyricsDrawer.setAttribute("aria-hidden", "true");
   el.queueDrawer.setAttribute("aria-hidden", "true");
+  $$('[data-action="lyrics-toggle"], [data-action="queue-toggle"]').forEach((b) => b.setAttribute("aria-expanded", "false"));
 }
 
 /* ============================================================
@@ -2216,6 +2356,9 @@ document.addEventListener("click", (e) => {
       break;
     case "create-playlist":
       promptCreatePlaylist();
+      break;
+    case "install-app":
+      triggerInstall();
       break;
     case "rename-playlist": {
       const pl = state.playlists.find((p) => p.id === state.currentPlaylistId);
@@ -2377,6 +2520,50 @@ el.content.addEventListener("scroll", () => {
 });
 
 /* ============================================================
+   PWA: install prompt + service worker registration
+============================================================ */
+let deferredInstallPrompt = null;
+
+function isStandalone() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+function refreshInstallButtonVisibility() {
+  const shouldShow = !!deferredInstallPrompt && !isStandalone();
+  el.installBtn.classList.toggle("is-visible", shouldShow);
+}
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  refreshInstallButtonVisibility();
+});
+async function triggerInstall() {
+  if (!deferredInstallPrompt) return;
+  el.installBtn.disabled = true;
+  deferredInstallPrompt.prompt();
+  try {
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    if (outcome === "accepted") toast("Melodify installed");
+  } catch {}
+  deferredInstallPrompt = null;
+  el.installBtn.disabled = false;
+  refreshInstallButtonVisibility();
+}
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  refreshInstallButtonVisibility();
+  toast("Melodify installed");
+});
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch((err) => {
+      console.warn("Service worker registration failed", err);
+    });
+  });
+}
+
+/* ============================================================
    INIT
 ============================================================ */
 function restoreLastPlayed() {
@@ -2392,8 +2579,18 @@ function init() {
   loadYouTubeApi();
   restoreLastPlayed();
   syncVolumeUI();
-  navigateTo("home");
+  const requestedView = new URLSearchParams(location.search).get("view");
+  if (requestedView === "search") {
+    navigateTo("home");
+    openSearch();
+  } else if (["favorites", "library"].includes(requestedView)) {
+    navigateTo(requestedView);
+  } else {
+    navigateTo("home");
+  }
   renderPlayerChrome();
+  refreshInstallButtonVisibility();
+  registerServiceWorker();
 }
 init();
 </script>
