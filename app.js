@@ -153,6 +153,20 @@ let ytPlayer = null;
 let ytReady = false;
 let progressTimer = null;
 
+// True whenever the user has asked for playback (any entry point) but the
+// YouTube IFrame API hasn't fired its ready event yet. handleYtReady()
+// consumes this flag through the SAME loadCurrentIntoPlayer() pipeline the
+// moment the player becomes usable, instead of the request being lost.
+let pendingAutoplay = false;
+
+// The videoId actually loaded into ytPlayer right now (or null). This is
+// deliberately tracked separately from state.currentSong: currentSong is
+// the *intended* song the instant the user acts, while loadedVideoId only
+// updates once ytPlayer.loadVideoById()/cueVideoById() has actually been
+// called. Comparing the two is how togglePlayPause() detects — and heals —
+// the exact "currentSong set but player never loaded" desync.
+let loadedVideoId = null;
+
 // ============================= STORAGE =======================================
 function loadStorage() {
   try {
@@ -612,23 +626,37 @@ function addToRecent(videoId) {
   saveRecent();
 }
 
+// This is the single playback pipeline. Every entry point in the app —
+// search results, recently played, favorites, playlists, next/previous,
+// repeat, auto-advance on end, and the pending-autoplay flush below — calls
+// this same function. Nothing else in app.js ever calls
+// ytPlayer.loadVideoById()/cueVideoById() directly.
 function loadCurrentIntoPlayer(autoplay) {
   const song = currentQueueSong();
   if (!song) return;
+
   state.currentSong = song;
   addToRecent(song.videoId);
   updateNowPlayingUI();
   state.lyricsData = null;
   renderLyricsPanel(null, true);
-
-  if (ytReady && ytPlayer) {
-    if (autoplay) ytPlayer.loadVideoById(song.videoId);
-    else ytPlayer.cueVideoById(song.videoId);
-  }
-
   if (elements.lyricsPanel && elements.lyricsPanel.classList.contains("is-open")) {
     loadLyricsForCurrentSong();
   }
+
+  if (!ytReady || !ytPlayer) {
+    // The IFrame API hasn't reported ready yet (common on the very first
+    // click of a session). Remember the intent instead of dropping it —
+    // handleYtReady() replays it through this exact function once the
+    // player can actually accept commands.
+    pendingAutoplay = autoplay;
+    return;
+  }
+
+  pendingAutoplay = false;
+  loadedVideoId = song.videoId;
+  if (autoplay) ytPlayer.loadVideoById(song.videoId);
+  else ytPlayer.cueVideoById(song.videoId);
 }
 
 function updateNowPlayingUI() {
@@ -673,7 +701,22 @@ function setPlayingUI(isPlaying) {
 }
 
 function togglePlayPause() {
-  if (!state.currentSong || !ytReady || !ytPlayer) return;
+  if (!state.currentSong) return;
+
+  if (!ytReady || !ytPlayer) {
+    // Same rule as loadCurrentIntoPlayer: never drop the request.
+    pendingAutoplay = true;
+    return;
+  }
+
+  if (loadedVideoId !== state.currentSong.videoId) {
+    // The player exists but never actually received the current song (the
+    // exact desync this rewrite fixes) — route back through the single
+    // pipeline instead of calling playVideo() on a stale/empty player.
+    loadCurrentIntoPlayer(true);
+    return;
+  }
+
   if (state.isPlaying) ytPlayer.pauseVideo();
   else ytPlayer.playVideo();
 }
@@ -754,6 +797,7 @@ function updateProgressUI() {
 
   allWithClass("seek-bar").forEach((bar) => {
     if (document.activeElement !== bar) bar.value = String(pct);
+    bar.style.setProperty("--fill", `${pct / 10}%`);
   });
   allWithClass("current-time").forEach((el) => (el.textContent = formatDuration(time)));
   allWithClass("duration-time").forEach((el) => (el.textContent = formatDuration(duration)));
@@ -785,6 +829,7 @@ function setVolume(value) {
   if (ytReady && ytPlayer) ytPlayer.setVolume(state.volume);
   allWithClass("volume-slider").forEach((slider) => {
     if (document.activeElement !== slider) slider.value = String(state.volume);
+    slider.style.setProperty("--fill", `${state.volume}%`);
   });
   allWithClass("volume-btn").forEach((btn) => {
     const onIcon = btn.querySelector(".icon-vol-on");
@@ -825,7 +870,10 @@ function toggleFavoriteId(videoId) {
 // host element (see .hidden-audio-host in style.css) and is created once,
 // then reused for every track — no destroy/recreate cycles, no mode switch.
 window.onYouTubeIframeAPIReady = function onYouTubeIframeAPIReady() {
-  if (!elements.youtubePlayerHost || typeof YT === "undefined") return;
+  if (!elements.youtubePlayerHost || typeof YT === "undefined") {
+    console.error("Melodify: #youtubePlayer mount point is missing — playback cannot start.");
+    return;
+  }
   ytPlayer = new YT.Player("youtubePlayer", {
     height: "1",
     width: "1",
@@ -838,6 +886,13 @@ function handleYtReady() {
   ytReady = true;
   ytPlayer.setVolume(state.volume);
   startProgressTimer();
+
+  // Replay whatever the user asked for while we were still loading, through
+  // the SAME pipeline — this is what closes the "currentSong is set but the
+  // player never loads" bug for good.
+  if (pendingAutoplay && state.currentSong) {
+    loadCurrentIntoPlayer(true);
+  }
 }
 function handleYtStateChange(event) {
   if (event.data === YT.PlayerState.PLAYING) {
@@ -1139,7 +1194,9 @@ function wirePlayerControls() {
     if (targetId) openPlaylistModal(targetId);
   });
   onAll("seek-bar", "input", (event) => {
-    const pct = Number(event.currentTarget.value) / 1000;
+    const bar = event.currentTarget;
+    bar.style.setProperty("--fill", `${Number(bar.value) / 10}%`);
+    const pct = Number(bar.value) / 1000;
     const time = pct * (state.duration || 0);
     allWithClass("current-time").forEach((el) => (el.textContent = formatDuration(time)));
   });
