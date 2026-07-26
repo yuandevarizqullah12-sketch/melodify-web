@@ -1,29 +1,24 @@
-// =============================================================================
-// services/api.js
-// The ONLY module in this project allowed to touch the network.
-// Responsible for: initializing Firebase/Firestore, reading the search
-// cache, calling the one backend endpoint (/api/search), and LRCLIB lyrics.
-// app.js never imports fetch(), firebase, or firestore directly.
-//
-// The frontend never writes to Firestore and never builds a dynamic backend
-// URL — every backend call is a plain, fixed fetch("/api/search?...").
-// =============================================================================
+// =============================================================
+// Melodify — services/api.js
+// Firebase init, Firestore access, memory cache, and all network
+// communication. NO UI code / NO DOM manipulation lives here.
+// =============================================================
 
-import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore,
   doc,
   getDoc,
+  setDoc,
+  serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// -----------------------------------------------------------------------------
-// Firebase configuration
-// -----------------------------------------------------------------------------
-// Replace with your own Firebase project's web config (Project settings ->
-// General -> Your apps -> SDK setup and configuration). The client SDK here
-// only ever performs reads (songs, search-cache); all writes happen inside
-// the Vercel backend using firebase-admin + a service account, so these
-// values never need write access in your Firestore security rules.
+// -------------------------------------------------------------
+// Firebase initialization
+// Replace with your own project's public web config. Firebase
+// web config values are not secret — access is controlled by
+// Firestore Security Rules, not by hiding this object.
+// -------------------------------------------------------------
 const firebaseConfig = {
   apiKey: "AIzaSyA2UJT5RD7CAcOJR6OTWfpkOEf8l2lhqlw",
   authDomain: "temporaryfileupload-92123.firebaseapp.com",
@@ -33,171 +28,204 @@ const firebaseConfig = {
   appId: "1:1068057413521:web:d4c2ba30c6c12e57ddfc30"
 };
 
+let app = null;
 let db = null;
 
-/**
- * Initializes Firebase + Firestore. Safe to call multiple times — reuses the
- * existing app instance if one is already running.
- */
-export function initFirebase() {
-  if (db) return db;
-  const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-  db = getFirestore(app);
+function getDb() {
+  if (!db) {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+  }
   return db;
 }
 
-function ensureDb() {
-  return db || initFirebase();
+// -------------------------------------------------------------
+// In-memory cache (fastest layer, cleared on page reload)
+// -------------------------------------------------------------
+const memoryCache = {
+  searches: new Map(), // normalizedQuery -> Song[]
+  songs: new Map(), // songId -> Song
+  lyrics: new Map(), // songId -> Lyrics
+};
+
+function normalizeQuery(query) {
+  return query.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function normalizeQuery(raw) {
-  return (raw || "").toLowerCase().trim().replace(/\s+/g, " ");
-}
-
-function songDocToObject(id, data) {
-  return {
-    videoId: id,
-    title: data.title || "Untitled",
-    artist: data.artist || "Unknown artist",
-    album: data.album || "",
-    duration: typeof data.duration === "number" ? data.duration : 0,
-    thumbnail: data.thumbnail || "",
-  };
-}
-
-// -----------------------------------------------------------------------------
-// Songs collection reads
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------
+// Song cache helpers
+// -------------------------------------------------------------
 
 /**
- * Loads song metadata for a list of videoIds from Firestore's `songs`
- * collection, preserving input order. Ids without a matching document are
- * skipped — metadata is written server-side the first time a search surfaces
- * a track, so a missing doc means the id never resolved to a real result.
+ * Store songs in the memory cache, keyed by id.
+ * @param {Array<Object>} songs
  */
-export async function getSongsByIds(videoIds) {
-  const database = ensureDb();
-  const unique = [...new Set((videoIds || []).filter(Boolean))];
-  const found = new Map();
+export function cacheSongs(songs) {
+  for (const song of songs) {
+    memoryCache.songs.set(song.id, song);
+  }
+  return songs;
+}
 
-  await Promise.all(
-    unique.map(async (id) => {
+/**
+ * Resolve a list of song ids to full song objects, checking the
+ * memory cache first, then Firestore's `songs` collection.
+ * Used to hydrate playlists/favorites that only store ids.
+ * @param {string[]} ids
+ * @returns {Promise<Array<Object>>}
+ */
+export async function resolveSongs(ids) {
+  const results = [];
+  const missing = [];
+
+  for (const id of ids) {
+    const cached = memoryCache.songs.get(id);
+    if (cached) {
+      results.push(cached);
+    } else {
+      missing.push(id);
+    }
+  }
+
+  if (missing.length === 0) return results;
+
+  const firestore = getDb();
+  const fetched = await Promise.all(
+    missing.map(async (id) => {
       try {
-        const snap = await getDoc(doc(database, "songs", id));
-        if (snap.exists()) found.set(id, songDocToObject(id, snap.data()));
-      } catch {
-        // A single failed lookup shouldn't fail the whole batch.
+        const snap = await getDoc(doc(firestore, "songs", id));
+        return snap.exists() ? { id, ...snap.data() } : null;
+      } catch (err) {
+        console.warn("resolveSongs: failed to fetch song", id, err);
+        return null;
       }
     })
   );
 
-  return (videoIds || []).filter((id) => found.has(id)).map((id) => found.get(id));
+  const resolved = fetched.filter(Boolean);
+  cacheSongs(resolved);
+  return [...results, ...resolved];
 }
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------
 // Search
-// -----------------------------------------------------------------------------
+// Flow: memory cache -> Firestore search cache -> YouTube API
+// (the Firestore + YouTube steps happen server-side in
+// /api/search.js so the API key is never exposed to the client)
+// -------------------------------------------------------------
 
 /**
- * Search flow:
- *  1. Normalize the query.
- *  2. Check Firestore `search-cache` for a matching document (read-only).
- *  3. On a hit, resolve song metadata straight from Firestore — no backend call.
- *  4. On a miss, call GET /api/search?q=<query>. The backend calls the
- *     YouTube Data API, writes `songs` + `search-cache`, and returns the
- *     resolved songs directly. The caller never learns which path was taken.
+ * Search for songs by query string.
+ * @param {string} query
+ * @returns {Promise<Array<Object>>}
  */
-export async function searchSongs(rawQuery) {
-  const normalized = normalizeQuery(rawQuery);
-  if (!normalized) return [];
+export async function searchSongs(query) {
+  const key = normalizeQuery(query);
+  if (!key) return [];
 
-  const database = ensureDb();
-
-  try {
-    const cacheSnap = await getDoc(doc(database, "search-cache", normalized));
-    if (cacheSnap.exists()) {
-      const videoIds = cacheSnap.data().videoIds || [];
-      const songs = await getSongsByIds(videoIds);
-      if (songs.length > 0) return songs;
-    }
-  } catch {
-    // Firestore unreachable — fall through to the backend.
+  if (memoryCache.searches.has(key)) {
+    return memoryCache.searches.get(key);
   }
 
-  const response = await fetch(`/api/search?q=${encodeURIComponent(normalized)}`, {
-    headers: { Accept: "application/json" },
-  });
+  const response = await fetch(`/api/search?q=${encodeURIComponent(key)}`);
   if (!response.ok) {
-    throw new Error(`Search failed with status ${response.status}`);
-  }
-  const payload = await response.json();
-  return Array.isArray(payload.songs) ? payload.songs : [];
-}
-
-// -----------------------------------------------------------------------------
-// Lyrics (LRCLIB)
-// -----------------------------------------------------------------------------
-
-/** Parses standard LRC-format synced lyrics into [{ time, text }]. */
-function parseLrc(lrcText) {
-  const lines = lrcText.split("\n");
-  const timeTag = /\[(\d{2}):(\d{2})(?:\.(\d{1,3}))?\]/g;
-  const out = [];
-
-  for (const line of lines) {
-    const matches = [...line.matchAll(timeTag)];
-    if (matches.length === 0) continue;
-    const text = line.replace(timeTag, "").trim();
-    for (const m of matches) {
-      const minutes = parseInt(m[1], 10);
-      const seconds = parseInt(m[2], 10);
-      const millis = m[3] ? parseInt(m[3].padEnd(3, "0"), 10) : 0;
-      out.push({ time: minutes * 60 + seconds + millis / 1000, text });
-    }
+    const message = await response.text().catch(() => "Search failed");
+    throw new Error(message || `Search failed with status ${response.status}`);
   }
 
-  return out.sort((a, b) => a.time - b.time);
+  const data = await response.json();
+  const songs = Array.isArray(data.songs) ? data.songs : [];
+
+  cacheSongs(songs);
+  memoryCache.searches.set(key, songs);
+  return songs;
 }
+
+// -------------------------------------------------------------
+// Lyrics
+// Flow: memory cache -> Firestore lyrics cache -> LRCLIB -> save
+// -------------------------------------------------------------
 
 /**
- * Fetches lyrics from LRCLIB for a given song. Returns
- * { synced: [{time,text}]|null, plain: string|null } or null if unavailable.
+ * Fetch lyrics (synced + plain) for a song.
+ * @param {{id: string, title: string, artist: string}} song
+ * @returns {Promise<{synced: Array<{time:number,text:string}>|null, plain: string|null}>}
  */
-export async function fetchLyrics({ title, artist, duration }) {
-  const getParams = new URLSearchParams({ track_name: title || "", artist_name: artist || "" });
-  if (duration) getParams.set("duration", String(Math.round(duration)));
+export async function fetchLyrics(song) {
+  const { id, title, artist } = song;
 
-  try {
-    const response = await fetch(`https://lrclib.net/api/get?${getParams.toString()}`, {
-      headers: { Accept: "application/json" },
-    });
-    if (response.ok) {
-      const data = await response.json();
-      const synced = data.syncedLyrics ? parseLrc(data.syncedLyrics) : null;
-      const plain = data.plainLyrics || null;
-      if (synced || plain) return { synced, plain };
-    }
-  } catch {
-    // fall through to the search-based fallback below
+  if (memoryCache.lyrics.has(id)) {
+    return memoryCache.lyrics.get(id);
   }
 
+  const firestore = getDb();
+
+  // 1. Firestore lyrics cache
   try {
-    const searchParams = new URLSearchParams({ track_name: title || "", artist_name: artist || "" });
-    const response = await fetch(`https://lrclib.net/api/search?${searchParams.toString()}`, {
-      headers: { Accept: "application/json" },
-    });
-    if (response.ok) {
-      const results = await response.json();
-      if (Array.isArray(results) && results.length > 0) {
-        const best = results[0];
-        const synced = best.syncedLyrics ? parseLrc(best.syncedLyrics) : null;
-        const plain = best.plainLyrics || null;
-        if (synced || plain) return { synced, plain };
+    const snap = await getDoc(doc(firestore, "lyrics", id));
+    if (snap.exists()) {
+      const data = snap.data();
+      const result = { synced: data.synced || null, plain: data.plain || null };
+      memoryCache.lyrics.set(id, result);
+      return result;
+    }
+  } catch (err) {
+    console.warn("fetchLyrics: Firestore read failed", err);
+  }
+
+  // 2. LRCLIB
+  let result = { synced: null, plain: null };
+  try {
+    const url = `https://lrclib.net/api/search?track_name=${encodeURIComponent(
+      title
+    )}&artist_name=${encodeURIComponent(artist)}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const matches = await res.json();
+      const best = Array.isArray(matches) && matches.length ? matches[0] : null;
+      if (best) {
+        result = {
+          synced: best.syncedLyrics ? parseLrc(best.syncedLyrics) : null,
+          plain: best.plainLyrics || null,
+        };
       }
     }
-  } catch {
-    // no lyrics available anywhere for this track
+  } catch (err) {
+    console.warn("fetchLyrics: LRCLIB request failed", err);
   }
 
-  return null;
+  memoryCache.lyrics.set(id, result);
+
+  // 3. Save cache (fire and forget)
+  setDoc(doc(firestore, "lyrics", id), {
+    ...result,
+    cachedAt: serverTimestamp(),
+  }).catch((err) => console.warn("fetchLyrics: Firestore write failed", err));
+
+  return result;
+}
+
+/**
+ * Parse standard LRC synced-lyrics format into [{time, text}].
+ * @param {string} lrc
+ */
+function parseLrc(lrc) {
+  const lines = lrc.split("\n");
+  const parsed = [];
+  const timeTag = /\[(\d{2}):(\d{2})(?:\.(\d{2,3}))?\]/g;
+
+  for (const line of lines) {
+    const tags = [...line.matchAll(timeTag)];
+    if (!tags.length) continue;
+    const text = line.replace(timeTag, "").trim();
+    for (const tag of tags) {
+      const minutes = parseInt(tag[1], 10);
+      const seconds = parseInt(tag[2], 10);
+      const millis = tag[3] ? parseInt(tag[3].padEnd(3, "0"), 10) : 0;
+      const time = minutes * 60 + seconds + millis / 1000;
+      parsed.push({ time, text });
+    }
+  }
+
+  return parsed.sort((a, b) => a.time - b.time);
 }
