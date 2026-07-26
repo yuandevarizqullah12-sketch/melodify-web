@@ -56,6 +56,13 @@ export default async function handler(req, res) {
     const rawResults = await searchYouTube(query);
     const songs = rawResults.map(normalizeYoutubeItem);
 
+    // Fetch durations in one batched call and attach them (used for
+    // lyrics duration-based matching downstream).
+    const durations = await fetchDurations(songs.map((s) => s.id));
+    for (const song of songs) {
+      song.durationSeconds = durations[song.id] || null;
+    }
+
     // 3. Save song documents + 4. Save search cache (best-effort, parallel)
     await Promise.all([
       ...songs.map((song) => firestoreSetDoc(projectId, token, `songs/${song.id}`, songToFields(song))),
@@ -106,6 +113,39 @@ async function searchYouTube(query) {
   return data.items || [];
 }
 
+async function fetchDurations(videoIds) {
+  if (!videoIds.length) return {};
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  const url = new URL("https://www.googleapis.com/youtube/v3/videos");
+  url.searchParams.set("part", "contentDetails");
+  url.searchParams.set("id", videoIds.join(","));
+  url.searchParams.set("key", apiKey);
+
+  try {
+    const res = await fetch(url.toString());
+    if (!res.ok) return {};
+    const data = await res.json();
+    const durations = {};
+    for (const item of data.items || []) {
+      durations[item.id] = parseIso8601Duration(item.contentDetails?.duration);
+    }
+    return durations;
+  } catch (err) {
+    console.warn("fetchDurations failed", err);
+    return {};
+  }
+}
+
+function parseIso8601Duration(iso) {
+  if (!iso) return null;
+  const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso);
+  if (!match) return null;
+  const hours = parseInt(match[1] || "0", 10);
+  const minutes = parseInt(match[2] || "0", 10);
+  const seconds = parseInt(match[3] || "0", 10);
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
 function normalizeYoutubeItem(item) {
   const snippet = item.snippet || {};
   const id = item.id?.videoId;
@@ -151,13 +191,17 @@ function decodeHtml(str) {
 // Firestore REST helpers (no external dependencies)
 // -------------------------------------------------------------
 function songToFields(song) {
-  return {
+  const fields = {
     title: { stringValue: song.title },
     artist: { stringValue: song.artist },
     thumbnail: { stringValue: song.thumbnail },
     channelTitle: { stringValue: song.channelTitle },
     cachedAt: { timestampValue: new Date().toISOString() },
   };
+  if (song.durationSeconds != null) {
+    fields.durationSeconds = { integerValue: String(song.durationSeconds) };
+  }
+  return fields;
 }
 
 function fieldsToSong(id, fields) {
@@ -167,6 +211,9 @@ function fieldsToSong(id, fields) {
     artist: fields.artist?.stringValue || "Unknown artist",
     thumbnail: fields.thumbnail?.stringValue || "",
     channelTitle: fields.channelTitle?.stringValue || "",
+    durationSeconds: fields.durationSeconds?.integerValue
+      ? parseInt(fields.durationSeconds.integerValue, 10)
+      : null,
   };
 }
 
